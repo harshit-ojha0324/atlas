@@ -1,0 +1,7 @@
+# forge tenants for local development only; never commit real keys.
+# Phase 3 gives every atlas tenant its own forge key so forge's quotas and
+# fair queueing apply per atlas tenant.
+tenants:
+  - name: atlas-dev
+    api_key: forge-atlas-localdev-key
+    daily_token_quota: 500000

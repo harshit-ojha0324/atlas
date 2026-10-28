@@ -1,0 +1,84 @@
+name: atlas
+
+# forge is built from its own checkout, a sibling of this repo by default.
+# Point FORGE_DIR elsewhere in .env if yours lives somewhere else.
+
+x-app-env: &app-env
+  DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-atlas}:${POSTGRES_PASSWORD:-atlas}@postgres:5432/${POSTGRES_DB:-atlas}
+  REDIS_URL: redis://redis:6379/0
+  FORGE_BASE_URL: http://forge:8080
+
+# Only the API and forge are published, and only on localhost.
+services:
+  postgres:
+    image: pgvector/pgvector:pg16
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-atlas}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-atlas}
+      POSTGRES_DB: ${POSTGRES_DB:-atlas}
+    volumes: [pgdata:/var/lib/postgresql/data]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-atlas}"]
+      interval: 3s
+      timeout: 3s
+      retries: 15
+
+  # Shared by atlas (db 0) and forge (db 1): one Redis to run, separate keyspaces.
+  redis:
+    image: redis:7-alpine
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 3s
+      timeout: 3s
+      retries: 15
+
+  migrate:
+    build: { context: ., dockerfile: docker/Dockerfile }
+    command: alembic upgrade head
+    environment: *app-env
+    depends_on:
+      postgres: { condition: service_healthy }
+
+  api:
+    build: { context: ., dockerfile: docker/Dockerfile }
+    ports: ["127.0.0.1:8000:8000"]
+    environment: *app-env
+    depends_on:
+      migrate: { condition: service_completed_successfully }
+      redis: { condition: service_healthy }
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request;urllib.request.urlopen('http://localhost:8000/healthz')\""]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  # --- forge: LLM gateway with circuit-breaker failover (primary -> fallback) ---
+  forge:
+    build: ${FORGE_DIR:-../forge}/services/gateway
+    ports: ["127.0.0.1:8081:8080"]  # host 8081: forge's own standalone stack uses 8080
+    environment:
+      FORGE_REDIS_URL: redis://redis:6379/1
+      FORGE_BREAKER_COOLDOWN_S: "10"
+      FORGE_CONNECT_TIMEOUT_S: "1"
+    volumes:
+      - ./deploy/forge-tenants.yaml:/etc/forge/tenants.yaml:ro
+    depends_on:
+      redis: { condition: service_healthy }
+      mock-vllm: { condition: service_started }
+      mock-gemini: { condition: service_started }
+
+  # Mock model servers until a real vLLM / Gemini key is wired in (forge's defaults point here).
+  mock-vllm:
+    build: ${FORGE_DIR:-../forge}/services/mock-llm
+    environment:
+      MOCK_NAME: vllm
+      MOCK_MODEL: qwen2.5-3b-instruct
+
+  mock-gemini:
+    build: ${FORGE_DIR:-../forge}/services/mock-llm
+    environment:
+      MOCK_NAME: gemini
+      MOCK_MODEL: gemini-2.0-flash
+
+volumes:
+  pgdata:
