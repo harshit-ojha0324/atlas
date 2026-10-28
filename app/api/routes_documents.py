@@ -1,7 +1,7 @@
-"""Upload, list, delete and search a tenant's documents.
+"""Upload, list, get, delete and search a tenant's documents.
 
-Upload is synchronous in Phase 1: the request returns once the document is
-chunked, embedded and committed. Phase 2 moves that work onto a worker.
+Upload only stores the PDF and queues it: the worker (app/worker.py) chunks and
+embeds it. Clients poll GET /documents/{id} until status is ready or failed.
 """
 
 import hashlib
@@ -9,15 +9,15 @@ from pathlib import PurePath
 
 from fastapi import APIRouter, Depends, File, HTTPException, Request, Response, UploadFile
 from pydantic import BaseModel, Field
-from sqlalchemy import delete, insert, select
-from sqlalchemy.exc import IntegrityError
+from redis.exceptions import RedisError
+from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from starlette.concurrency import run_in_threadpool
 
 from app.api.deps import get_session, require_tenant
-from app.core.chunking import DocumentTooLarge, build_chunks, extract_pages
+from app.core.queue import enqueue
 from app.core.retrieval import retrieve
-from app.models import Chunk, Document
+from app.models import Document
 
 router = APIRouter(tags=["documents"])
 
@@ -27,9 +27,10 @@ MAX_UPLOAD_BYTES = 10 * 1024 * 1024
 class DocumentOut(BaseModel):
     id: int
     name: str
-    status: str
-    pages: int
-    chunk_count: int
+    status: str  # pending | ready | failed
+    pages: int | None
+    chunk_count: int | None
+    error: str | None
 
 
 class SearchRequest(BaseModel):
@@ -47,11 +48,16 @@ class HitOut(BaseModel):
 
 def _out(doc: Document) -> DocumentOut:
     return DocumentOut(
-        id=doc.id, name=doc.name, status=doc.status, pages=doc.pages, chunk_count=doc.chunk_count
+        id=doc.id,
+        name=doc.name,
+        status=doc.status,
+        pages=doc.pages,
+        chunk_count=doc.chunk_count,
+        error=doc.error,
     )
 
 
-@router.post("/documents", status_code=201)
+@router.post("/documents", status_code=202)
 async def upload_document(
     request: Request,
     response: Response,
@@ -66,61 +72,38 @@ async def upload_document(
     data = await file.read(MAX_UPLOAD_BYTES + 1)
     if len(data) > MAX_UPLOAD_BYTES:
         raise HTTPException(status_code=413, detail=f"PDFs are limited to {MAX_UPLOAD_BYTES // 2**20} MB")
+    if not data.startswith(b"%PDF-"):
+        raise HTTPException(status_code=400, detail="the file is not a PDF")
     digest = hashlib.sha256(data).hexdigest()
 
+    # the same bytes already indexed, or on their way: nothing to redo
     existing = (
-        await session.execute(select(Document).where(Document.tenant_id == tenant_id, Document.name == name))
+        await session.execute(
+            select(Document)
+            .where(
+                Document.tenant_id == tenant_id,
+                Document.name == name,
+                Document.sha256 == digest,
+                Document.status.in_(("pending", "ready")),
+            )
+            .order_by(Document.id.desc())
+            .limit(1)
+        )
     ).scalar_one_or_none()
-    if existing and existing.sha256 == digest:
-        response.status_code = 200  # same bytes already indexed: nothing to redo
+    if existing:
+        response.status_code = 200
         return _out(existing)
 
-    embedder = request.app.state.embedder
+    doc = Document(tenant_id=tenant_id, name=name, sha256=digest, status="pending", content=data)
+    session.add(doc)
+    await session.commit()
     try:
-        pages = await run_in_threadpool(extract_pages, data)
-    except Exception:
-        raise HTTPException(status_code=422, detail="could not read the PDF")
-    try:
-        chunks = await run_in_threadpool(build_chunks, pages, embedder)
-    except DocumentTooLarge as e:
-        raise HTTPException(status_code=413, detail=str(e))
-    if not chunks:
-        raise HTTPException(status_code=422, detail="the PDF has no extractable text")
-
-    # One transaction: a re-upload replaces the old version (its chunks go by
-    # cascade), and a failure leaves the old version searchable.
-    doc = Document(
-        tenant_id=tenant_id,
-        name=name,
-        sha256=digest,
-        status="ready",
-        pages=len(pages),
-        chunk_count=len(chunks),
-    )
-    try:
-        if existing:
-            await session.delete(existing)
-            await session.flush()
-        session.add(doc)
-        await session.flush()
-        await session.execute(
-            insert(Chunk),
-            [
-                {
-                    "document_id": doc.id,
-                    "tenant_id": tenant_id,
-                    "idx": i,
-                    "page": page,
-                    "text": text,
-                    "embedding": vec,
-                }
-                for i, (page, text, vec) in enumerate(chunks)
-            ],
-        )
+        await enqueue(request.app.state.redis, request.app.state.settings, doc.id)
+    except RedisError:
+        # a row nobody will ever process is worse than a failed upload
+        await session.delete(doc)
         await session.commit()
-    except IntegrityError:
-        # two uploads of the same name raced; the (tenant_id, name) unique key let one win
-        raise HTTPException(status_code=409, detail="another upload of this document name is in progress")
+        raise HTTPException(status_code=503, detail="ingestion queue unavailable; try again shortly")
     return _out(doc)
 
 
@@ -129,16 +112,29 @@ async def list_documents(
     tenant_id: int = Depends(require_tenant), session: AsyncSession = Depends(get_session)
 ) -> list[DocumentOut]:
     rows = await session.execute(
-        select(Document).where(Document.tenant_id == tenant_id).order_by(Document.created_at)
+        select(Document).where(Document.tenant_id == tenant_id).order_by(Document.id)
     )
     return [_out(d) for d in rows.scalars()]
+
+
+@router.get("/documents/{document_id}")
+async def get_document(
+    document_id: int, tenant_id: int = Depends(require_tenant), session: AsyncSession = Depends(get_session)
+) -> DocumentOut:
+    doc = await session.scalar(
+        select(Document).where(Document.id == document_id, Document.tenant_id == tenant_id)
+    )
+    if doc is None:
+        raise HTTPException(status_code=404, detail="document not found")
+    return _out(doc)
 
 
 @router.delete("/documents/{document_id}", status_code=204)
 async def delete_document(
     document_id: int, tenant_id: int = Depends(require_tenant), session: AsyncSession = Depends(get_session)
 ) -> None:
-    # another tenant's id gets the same 404 as a missing one: ids don't leak
+    # another tenant's id gets the same 404 as a missing one: ids don't leak.
+    # Deleting a pending document is safe: the worker finds no row and skips it.
     result = await session.execute(
         delete(Document).where(Document.id == document_id, Document.tenant_id == tenant_id)
     )

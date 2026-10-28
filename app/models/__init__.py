@@ -7,7 +7,7 @@ on it directly, so isolation never depends on a join being written correctly.
 from datetime import datetime
 
 from pgvector.sqlalchemy import Vector
-from sqlalchemy import BigInteger, DateTime, ForeignKey, Integer, Text, UniqueConstraint, func
+from sqlalchemy import BigInteger, DateTime, ForeignKey, Index, Integer, LargeBinary, Text, func, text
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
 EMBEDDING_DIM = 384  # all-MiniLM-L6-v2; see app/core/embeddings.py
@@ -41,8 +41,23 @@ class ApiKey(Base):
 
 
 class Document(Base):
+    """One uploaded version of a named PDF.
+
+    pending -> ready | failed. A re-upload is a new row; the previous ready
+    version stays searchable until the new one is ready, then the worker
+    deletes it. At most one ready row per (tenant, name).
+    """
+
     __tablename__ = "documents"
-    __table_args__ = (UniqueConstraint("tenant_id", "name"),)
+    __table_args__ = (
+        Index(
+            "uq_documents_ready_name",
+            "tenant_id",
+            "name",
+            unique=True,
+            postgresql_where=text("status = 'ready'"),
+        ),
+    )
 
     id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
     tenant_id: Mapped[int] = mapped_column(
@@ -50,10 +65,14 @@ class Document(Base):
     )
     name: Mapped[str] = mapped_column(Text, nullable=False)
     sha256: Mapped[str] = mapped_column(Text, nullable=False)
-    # always "ready" until Phase 2 makes ingestion asynchronous (pending/failed)
-    status: Mapped[str] = mapped_column(Text, nullable=False, default="ready")
-    pages: Mapped[int] = mapped_column(Integer, nullable=False)
-    chunk_count: Mapped[int] = mapped_column(Integer, nullable=False)
+    status: Mapped[str] = mapped_column(Text, nullable=False, default="pending")
+    # the uploaded PDF, held only until the worker finishes with it
+    content: Mapped[bytes | None] = mapped_column(LargeBinary, nullable=True, deferred=True)
+    error: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # bumped and committed before each processing attempt: see app/worker.py
+    attempts: Mapped[int] = mapped_column(Integer, nullable=False, default=0, server_default="0")
+    pages: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    chunk_count: Mapped[int | None] = mapped_column(Integer, nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, server_default=func.now()
     )

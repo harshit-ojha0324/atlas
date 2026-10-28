@@ -53,6 +53,16 @@ services:
       timeout: 3s
       retries: 10
 
+  # Ingestion: chunks and embeds queued uploads. Scale with --scale worker=N.
+  worker:
+    build: { context: ., dockerfile: docker/Dockerfile }
+    command: python -m app.worker
+    environment: *app-env
+    restart: unless-stopped  # a crashed worker comes back and resumes its own pending entries
+    depends_on:
+      migrate: { condition: service_completed_successfully }
+      redis: { condition: service_healthy }
+
   # --- forge: LLM gateway with circuit-breaker failover (primary -> fallback) ---
   forge:
     build: ${FORGE_DIR:-../forge}/services/gateway

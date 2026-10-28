@@ -22,6 +22,20 @@ class Settings(BaseSettings):
     # DB pool
     db_pool_size: int = 10
 
+    # Ingestion over Redis Streams (see app/worker.py)
+    stream_key: str = "ingest"
+    stream_group: str = "ingesters"
+    stream_maxlen: int = 100_000
+    dlq_key: str = "ingest:dlq"
+    dlq_maxlen: int = 10_000
+    worker_block_ms: int = 5000
+    # longer than the slowest legitimate ingest (capped at 2,000 chunks), so a
+    # live worker's document isn't reclaimed and processed twice
+    worker_reclaim_min_idle_ms: int = 120_000
+    # attempts that died without finishing (crash, OOM, kill) before giving up
+    worker_max_attempts: int = 3
+    worker_metrics_port: int = 9100
+
 
 @lru_cache
 def get_settings() -> Settings:

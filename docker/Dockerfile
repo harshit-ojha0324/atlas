@@ -1,4 +1,4 @@
-# Multi-stage build shared by the API and (from Phase 2) the worker.
+# Multi-stage build shared by the API and the worker (compose overrides the command).
 FROM python:3.12-slim AS builder
 RUN python -m venv /venv
 ENV PATH=/venv/bin:$PATH
