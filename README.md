@@ -76,6 +76,22 @@ Every LLM call goes through forge using the asking tenant's own forge key. `make
 
 A follow-up question (`history` given) is first rewritten into a standalone question, which is then used for both retrieval and the answer: two forge calls, as the RAG app's LangChain chain did. Prompts are the RAG app's: system rules above delimited, untrusted context. If retrieval finds nothing, `/ask` says so without calling forge at all.
 
+## Rate limits and the security layer
+
+**Rate limits.** Every tenant has two token buckets, using shrtr's Lua limiter:
+- **uploads:** 10, refilling at 12 a minute
+- **queries** (`/search` and `/ask`): 30, refilling at 1 a second
+
+Limited responses carry `X-RateLimit-*` headers; refusals are 429 with `Retry-After`. If Redis is down, uploads return 503 (they need Redis to be queued anyway) and queries go through unlimited.
+
+**Security layer on `/ask`**, ported from the RAG app:
+- **PII:** emails, phone numbers, SSNs and card numbers are redacted from the question and the history before anything reaches forge. Names are kept, since they're what people ask about.
+- **Injection:** a question that looks like a prompt injection gets a 400. A history turn that does is dropped from the history instead, so one blocked question doesn't block the conversation.
+- **Planted instructions:** retrieved passages containing instructions aimed at the model (indirect injection through an uploaded document) are left out of the prompt. This uses a narrower pattern than for questions, so policy text like "new rules take effect in May" isn't flagged.
+- **Credentials:** API keys, passwords and tokens in the answer are masked.
+
+Each action is reported in the response's `security_warnings` and counted in `security_events_total`. The raw text is never logged. The patterns are regex only; the RAG app also ran Presidio (spaCy's ~600 MB model), left out here to keep the image smaller.
+
 ## Readiness
 
 `/readyz` returns 503 when Postgres or Redis is down. forge is reported but never fails readiness: without it, questions fail, but uploads and listing still work.
@@ -86,6 +102,6 @@ A follow-up question (`history` given) is first rewritten into a standalone ques
 - [x] **Phase 1:** tenants, API keys, chunks table; synchronous upload and tenant-scoped retrieval
 - [x] **Phase 2:** background ingestion over Redis Streams (worker, dead-letter queue, kill-the-worker drill)
 - [x] **Phase 3:** all LLM calls through forge, one forge key per tenant
-- [ ] **Phase 4:** token-bucket rate limits and the security layer
+- [x] **Phase 4:** token-bucket rate limits and the security layer
 - [ ] **Phase 5:** MCP server (`search_documents`, `ask`, `list_documents`)
 - [ ] **Phase 6:** evals, failure drills and benchmarks gated in CI
