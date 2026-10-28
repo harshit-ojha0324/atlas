@@ -1,5 +1,12 @@
 """Ingestion worker (Redis Streams consumer group), ported from shrtr's analytics worker.
 
+Fairness: every tenant has its own stream (ingest:<tenant_id>). A worker takes
+the next document from the first tenant after the last one it served that has
+work waiting, so a tenant's backlog delays another tenant by at most one
+document per worker, not by the whole backlog (forge's per-tenant queues, in
+plain round-robin). Fair by document, not by work: one huge PDF still holds a
+worker until it's done, as forge's fairness is by slots, not tokens.
+
 Guarantees:
 - at-least-once delivery: an entry stays in the group's pending list until XACK.
   Every 10th loop a worker retries its own pending entries (so a restarted
@@ -68,32 +75,47 @@ class IngestWorker:
         # pending entries are its own again.
         self.name = name or os.environ.get("WORKER_NAME") or f"{socket.gethostname()}-{os.getpid()}"
         self.shutting_down = False
+        self.ready_streams: set[str] = set()  # streams whose consumer group this worker has ensured
+        self.last_served = ""  # the stream the last new entry came from
 
     # --- stream plumbing (from shrtr) ---
 
-    async def ensure_group(self) -> None:
-        key, group = self.settings.stream_key, self.settings.stream_group
-        try:
-            await self.redis.xgroup_create(key, group, id="0", mkstream=True)
-        except ResponseError as exc:
-            if "BUSYGROUP" not in str(exc):
-                raise
-        # recreated containers leave consumers behind: drop idle ones holding nothing
-        for c in await self.redis.xinfo_consumers(key, group):
-            if c["pending"] == 0 and c["idle"] > STALE_CONSUMER_MS:
-                await self.redis.xgroup_delconsumer(key, group, c["name"])
+    async def streams(self) -> list[str]:
+        """Every tenant stream, in tenant order, each with its consumer group."""
+        group = self.settings.stream_group
+        tenant_ids = sorted(int(t) for t in await self.redis.smembers(self.settings.tenants_key))
+        streams = [self.settings.tenant_stream(t) for t in tenant_ids]
+        for key in streams:
+            if key in self.ready_streams:
+                continue
+            try:
+                await self.redis.xgroup_create(key, group, id="0", mkstream=True)
+            except ResponseError as exc:
+                if "BUSYGROUP" not in str(exc):
+                    raise
+            # recreated containers leave consumers behind: drop idle ones holding nothing
+            for c in await self.redis.xinfo_consumers(key, group):
+                if c["pending"] == 0 and c["idle"] > STALE_CONSUMER_MS:
+                    await self.redis.xgroup_delconsumer(key, group, c["name"])
+            self.ready_streams.add(key)
+        return streams
 
-    async def ack(self, entry_id: str) -> None:
-        await self.redis.xack(self.settings.stream_key, self.settings.stream_group, entry_id)
+    async def ack(self, stream: str, entry_id: str) -> None:
+        await self.redis.xack(stream, self.settings.stream_group, entry_id)
 
-    async def dlq(self, entry_id: str, fields: dict, reason: str) -> None:
+    async def dlq(self, stream: str, entry_id: str, fields: dict, reason: str) -> None:
         await self.redis.xadd(
             self.settings.dlq_key,
-            {"original_id": entry_id, "reason": reason, **{k: str(v) for k, v in fields.items()}},
+            {
+                "stream": stream,
+                "original_id": entry_id,
+                "reason": reason,
+                **{k: str(v) for k, v in fields.items()},
+            },
             maxlen=self.settings.dlq_maxlen,  # bounded: a poison flood can't grow Redis forever
             approximate=True,
         )
-        await self.ack(entry_id)
+        await self.ack(stream, entry_id)
         OUTCOMES.labels(outcome="dlq").inc()
 
     async def db_reachable(self) -> bool:
@@ -106,14 +128,14 @@ class IngestWorker:
 
     # --- one entry ---
 
-    async def handle(self, entry_id: str, fields: dict | None) -> None:
+    async def handle(self, stream: str, entry_id: str, fields: dict | None) -> None:
         if not fields:  # trimmed from the stream while pending: nothing to process
-            await self.ack(entry_id)
+            await self.ack(stream, entry_id)
             return
         try:
             doc_id = int(fields["doc_id"])
         except (KeyError, ValueError):
-            await self.dlq(entry_id, fields, "parse_error")
+            await self.dlq(stream, entry_id, fields, "parse_error")
             return
         try:
             dead_letter_reason = await self.ingest(doc_id)
@@ -126,9 +148,9 @@ class IngestWorker:
             await self.mark_failed(doc_id, "internal error while processing; try uploading again")
             dead_letter_reason = "processing_error"
         if dead_letter_reason:
-            await self.dlq(entry_id, fields, dead_letter_reason)
+            await self.dlq(stream, entry_id, fields, dead_letter_reason)
         else:
-            await self.ack(entry_id)
+            await self.ack(stream, entry_id)
 
     async def ingest(self, doc_id: int) -> str | None:
         """Process one document. Returns a dead-letter reason, or None to ack."""
@@ -228,49 +250,70 @@ class IngestWorker:
 
     # --- the loop ---
 
-    async def retry_pending(self) -> list:
-        """My own pending entries, then other consumers' stalled ones."""
-        key, group = self.settings.stream_key, self.settings.stream_group
-        mine = await self.redis.xreadgroup(group, self.name, {key: "0"}, count=10)
-        entries = list(mine[0][1]) if mine else []
-        try:
-            res = await self.redis.xautoclaim(
-                key,
-                group,
-                self.name,
-                min_idle_time=self.settings.worker_reclaim_min_idle_ms,
-                start_id="0-0",
-                count=10,
-            )
-            entries += res[1]
-        except ResponseError:
-            pass
-        try:
+    async def retry_pending(self, streams: list[str]) -> list[tuple[str, str, dict]]:
+        """My own pending entries, then other consumers' stalled ones, from every stream.
+
+        ponytail: two Redis calls per tenant stream every 10th loop; batch them
+        in a pipeline if tenants number in the thousands.
+        """
+        group = self.settings.stream_group
+        entries, pending = [], 0
+        for key in streams:
+            mine = await self.redis.xreadgroup(group, self.name, {key: "0"}, count=10)
+            entries += [(key, *e) for e in (mine[0][1] if mine else [])]
+            try:
+                res = await self.redis.xautoclaim(
+                    key,
+                    group,
+                    self.name,
+                    min_idle_time=self.settings.worker_reclaim_min_idle_ms,
+                    start_id="0-0",
+                    count=10,
+                )
+                entries += [(key, *e) for e in res[1]]
+            except ResponseError:
+                pass
             summary = await self.redis.xpending(key, group)
-            STREAM_PENDING.set(summary.get("pending", 0) if isinstance(summary, dict) else 0)
-        except RedisError:
-            pass
+            pending += summary.get("pending", 0) if isinstance(summary, dict) else 0
+        STREAM_PENDING.set(pending)
         return entries
+
+    async def take_next(self, streams: list[str], block_ms: int | None) -> list[tuple[str, str, dict]]:
+        """A new entry from the first tenant after the last one served that has work waiting."""
+        group = self.settings.stream_group
+        after = streams.index(self.last_served) + 1 if self.last_served in streams else 0
+        for key in streams[after:] + streams[:after]:
+            # count=1: documents are heavy, so a reclaim never steals a queue of them
+            resp = await self.redis.xreadgroup(group, self.name, {key: ">"}, count=1)
+            if resp:
+                self.last_served = key
+                return [(key, *resp[0][1][0])]
+        if not block_ms:
+            return []
+        if not streams:  # no tenant has uploaded yet
+            await asyncio.sleep(block_ms / 1000)
+            return []
+        # Nothing queued anywhere: wait on every stream. A tenant's first-ever
+        # stream joins on the next loop, so its first upload can wait one block.
+        resp = await self.redis.xreadgroup(
+            group, self.name, {k: ">" for k in streams}, count=1, block=block_ms
+        )
+        return [(key, *e) for key, batch in resp or [] for e in batch]
 
     async def step(self, sweep: bool, block_ms: int | None) -> int:
         """One loop iteration; returns how many entries it handled."""
-        entries = await self.retry_pending() if sweep else []
-        resp = await self.redis.xreadgroup(
-            self.settings.stream_group,
-            self.name,
-            {self.settings.stream_key: ">"},
-            count=1,  # documents are heavy: one at a time, so a reclaim never steals a queue of them
-            block=block_ms,
-        )
-        if resp:  # ">" returns only never-delivered entries, so none repeat the sweep's
-            entries += resp[0][1]
-        for entry_id, fields in entries:
-            await self.handle(entry_id, fields)
+        streams = await self.streams()
+        entries = await self.retry_pending(streams) if sweep else []
+        # ">" returns only never-delivered entries, so none repeat the sweep's
+        entries += await self.take_next(streams, None if entries else block_ms)
+        for stream, entry_id, fields in entries:
+            await self.handle(stream, entry_id, fields)
         return len(entries)
 
     async def run(self) -> None:
-        await self.ensure_group()
-        log.info("worker %s consuming %s/%s", self.name, self.settings.stream_key, self.settings.stream_group)
+        log.info(
+            "worker %s consuming %s:* / %s", self.name, self.settings.stream_key, self.settings.stream_group
+        )
         loop_n = 0
         while not self.shutting_down:
             try:

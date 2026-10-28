@@ -31,7 +31,7 @@ async def test_redelivery_after_commit_changes_nothing(env):
     assert (await doc(env, doc_id)).status == "ready" and await chunk_count(env, doc_id) == 1
 
     # a crash between COMMIT and XACK redelivers the entry
-    await env.worker().handle("1-0", {"doc_id": str(doc_id)})
+    await env.worker().handle(env.stream("a"), "1-0", {"doc_id": str(doc_id)})
     d = await doc(env, doc_id)
     assert d.status == "ready" and d.attempts == 1 and await chunk_count(env, doc_id) == 1
 
@@ -39,9 +39,9 @@ async def test_redelivery_after_commit_changes_nothing(env):
 async def test_restarted_worker_resumes_the_document_it_died_holding(env):
     doc_id = (await env.upload("a", "p.pdf", [PAGE])).json()["id"]
     first = env.worker(name="w1")
-    await first.ensure_group()
+    await first.streams()
     # w1 takes the entry, counts its attempt, then dies before finishing
-    await env.redis.xreadgroup(env.settings.stream_group, "w1", {env.settings.stream_key: ">"}, count=1)
+    await env.redis.xreadgroup(env.settings.stream_group, "w1", {env.stream("a"): ">"}, count=1)
     await first.claim(doc_id)
     assert await env.pending() == 1
 
@@ -88,12 +88,12 @@ async def test_older_version_finishing_last_is_discarded(env):
     old_id = (await env.upload("a", "r.pdf", ["Version one."])).json()["id"]
     new_id = (await env.upload("a", "r.pdf", ["Version two."])).json()["id"]
     w = env.worker()
-    await w.ensure_group()
+    await w.streams()
     ((_, entries),) = await env.redis.xreadgroup(
-        env.settings.stream_group, w.name, {env.settings.stream_key: ">"}, count=2
+        env.settings.stream_group, w.name, {env.stream("a"): ">"}, count=2
     )
     for entry_id, fields in reversed(entries):  # the newer upload finishes first
-        await w.handle(entry_id, fields)
+        await w.handle(env.stream("a"), entry_id, fields)
 
     assert await doc(env, old_id) is None
     assert (await doc(env, new_id)).status == "ready"
@@ -107,3 +107,20 @@ async def test_upload_with_redis_down_leaves_no_orphan(env, monkeypatch):
     assert r.status_code == 503
     async with env.sessions() as session:
         assert await session.scalar(select(func.count()).select_from(Document)) == 0
+
+
+async def test_one_tenants_backlog_doesnt_delay_another_tenants_document(env):
+    a_ids = [(await env.upload("a", f"a{i}.pdf", [f"Tenant A page {i}."])).json()["id"] for i in range(5)]
+    b_id = (await env.upload("b", "b.pdf", ["Tenant B's only page."])).json()["id"]
+    w = env.worker()
+    order = []
+    ingest = w.ingest
+
+    async def record(doc_id):
+        order.append(doc_id)
+        return await ingest(doc_id)
+
+    w.ingest = record
+    await env.drain(w)
+    # B's document goes second, right after A's first, not behind all five
+    assert order == [a_ids[0], b_id, *a_ids[1:]]

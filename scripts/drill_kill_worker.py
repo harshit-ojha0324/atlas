@@ -34,8 +34,8 @@ def redis(*args: str) -> str:
     return compose("exec", "-T", "redis", "redis-cli", *args).strip()
 
 
-def pending_entries() -> int:
-    return int(redis("XPENDING", "ingest", "ingesters").splitlines()[0])
+def pending_entries(stream: str) -> int:
+    return int(redis("XPENDING", stream, "ingesters").splitlines()[0])
 
 
 def wait_for(predicate, timeout_s: float, what: str):
@@ -65,6 +65,7 @@ def main() -> None:
     name = f"drill-{int(time.time())}"
     out = compose("run", "--rm", "--no-deps", "api", "python", "-m", "app.scripts.create_tenant", name)
     key = out.split("(shown once): ")[1].strip()
+    stream = f"ingest:{out.split('(id ')[1].split(')')[0]}"  # the tenant's own ingestion stream
     client = httpx.Client(base_url=API, headers={"X-API-Key": key}, timeout=60)
     data = big_pdf()
     dlq_before = int(redis("XLEN", "ingest:dlq"))
@@ -86,7 +87,7 @@ def main() -> None:
 
         # 2. the drill document: wait until the worker holds it, then kill it mid-ingest
         doc = client.post("/documents", files={"file": ("drill.pdf", data, "application/pdf")}).json()
-        wait_for(lambda: pending_entries() == 1, 30, "the worker to take the entry")
+        wait_for(lambda: pending_entries(stream) == 1, 30, "the worker to take the entry")
         time.sleep(control_s / 3)
         compose("kill", "-s", "SIGKILL", "worker")
         killed = status(doc["id"])
@@ -95,7 +96,7 @@ def main() -> None:
         attempts = psql(f"SELECT attempts FROM documents WHERE id = {doc['id']}")
         print(
             f"killed worker mid-ingest: status pending, attempts {attempts},"
-            f" {pending_entries()} entry pending"
+            f" {pending_entries(stream)} entry pending"
         )
 
         # 3. restart: the same container comes back as the same consumer and resumes its entry
@@ -117,7 +118,7 @@ def main() -> None:
                 f"SELECT attempts FROM documents WHERE id = {doc['id']}"
             )
             == "2",
-            "nothing left pending": pending_entries() == 0,
+            "nothing left pending": pending_entries(stream) == 0,
             "nothing dead-lettered": int(redis("XLEN", "ingest:dlq")) == dlq_before,
         }
         for check, ok in checks.items():

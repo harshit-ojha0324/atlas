@@ -61,9 +61,13 @@ class Env:
     redis: fakeredis.FakeAsyncRedis
     settings: Settings
     keys: dict[str, str]
+    ids: dict[str, int]
 
     def as_tenant(self, name: str) -> dict:
         return {"X-API-Key": self.keys[name]}
+
+    def stream(self, tenant: str) -> str:
+        return self.settings.tenant_stream(self.ids[tenant])
 
     def worker(self, name: str = "test-worker", embedder=None) -> IngestWorker:
         return IngestWorker(self.settings, self.redis, self.sessions, embedder or FakeEmbedder(), name=name)
@@ -77,12 +81,14 @@ class Env:
     async def drain(self, worker: IngestWorker | None = None) -> None:
         """Run a worker until the stream has nothing left for it."""
         worker = worker or self.worker()
-        await worker.ensure_group()
         while await worker.step(sweep=True, block_ms=None):
             pass
 
     async def pending(self) -> int:
-        return (await self.redis.xpending(self.settings.stream_key, self.settings.stream_group))["pending"]
+        streams = [
+            self.settings.tenant_stream(t) for t in await self.redis.smembers(self.settings.tenants_key)
+        ]
+        return sum([(await self.redis.xpending(s, self.settings.stream_group))["pending"] for s in streams])
 
 
 @pytest.fixture
@@ -92,13 +98,13 @@ async def env(database):
     async with engine.begin() as conn:
         await conn.execute(text("TRUNCATE tenants RESTART IDENTITY CASCADE"))
     deps._KEY_CACHE.clear()  # ids restart, so cached key -> tenant mappings would be stale
-    keys = {}
+    keys, ids = {}, {}
     async with sessions() as session:
         for name in ("a", "b"):
             tenant = Tenant(name=name, forge_api_key=f"forge-{name}")
             session.add(tenant)
             await session.flush()
-            keys[name] = f"key-{name}"
+            keys[name], ids[name] = f"key-{name}", tenant.id
             session.add(ApiKey(tenant_id=tenant.id, key_hash=deps.hash_key(keys[name]), name="test"))
         await session.commit()
 
@@ -114,6 +120,6 @@ async def env(database):
     app.state.rate_limiter = RateLimiter(redis)
     app.state.forge = httpx.AsyncClient(base_url=FORGE)  # tests mock it with respx
     async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://t") as client:
-        yield Env(client, sessions, redis, settings, keys)
+        yield Env(client, sessions, redis, settings, keys, ids)
     await app.state.forge.aclose()
     await engine.dispose()

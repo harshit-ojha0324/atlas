@@ -90,10 +90,17 @@ async def upload_document(
     await session.commit()
     try:
         settings = request.app.state.settings
-        # the worker (app/worker.py) consumes this stream
-        await request.app.state.redis.xadd(
-            settings.stream_key, {"doc_id": str(doc.id)}, maxlen=settings.stream_maxlen, approximate=True
-        )
+        # The tenant's own stream: the worker (app/worker.py) round-robins
+        # across tenants, so one tenant's backlog doesn't delay the others.
+        async with request.app.state.redis.pipeline(transaction=True) as pipe:
+            pipe.sadd(settings.tenants_key, tenant_id)
+            pipe.xadd(
+                settings.tenant_stream(tenant_id),
+                {"doc_id": str(doc.id)},
+                maxlen=settings.stream_maxlen,
+                approximate=True,
+            )
+            await pipe.execute()
     except RedisError:
         # a row nobody will ever process is worse than a failed upload
         await session.delete(doc)

@@ -37,7 +37,8 @@ class Settings(BaseSettings):
     # DB pool
     db_pool_size: int = 10
 
-    # Ingestion over Redis Streams (see app/worker.py)
+    # Ingestion over Redis Streams (see app/worker.py): one stream per tenant,
+    # ingest:<tenant_id>, and a set of the tenants that have one
     stream_key: str = "ingest"
     stream_group: str = "ingesters"
     stream_maxlen: int = 100_000
@@ -50,6 +51,13 @@ class Settings(BaseSettings):
     # attempts that died without finishing (crash, OOM, kill) before giving up
     worker_max_attempts: int = 3
     worker_metrics_port: int = 9100
+
+    def tenant_stream(self, tenant_id: int | str) -> str:
+        return f"{self.stream_key}:{tenant_id}"
+
+    @property
+    def tenants_key(self) -> str:
+        return f"{self.stream_key}:tenants"
 
 
 @lru_cache
