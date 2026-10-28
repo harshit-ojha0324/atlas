@@ -1,0 +1,8 @@
+# forge tenants for local development only; never commit real keys.
+# `make up` copies this to deploy/forge-tenants.yaml (gitignored), and
+# `make tenant` appends one entry per atlas tenant to that copy.
+# forge needs at least one entry, so this one stays.
+tenants:
+  - name: atlas-dev
+    api_key: forge-atlas-localdev-key
+    daily_token_quota: 500000

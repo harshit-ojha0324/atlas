@@ -44,6 +44,9 @@ services:
     build: { context: ., dockerfile: docker/Dockerfile }
     ports: ["127.0.0.1:8000:8000"]
     environment: *app-env
+    volumes:
+      # `make tenant` (run in this container) appends each tenant's forge key here
+      - ./deploy/forge-tenants.yaml:/app/deploy/forge-tenants.yaml
     depends_on:
       migrate: { condition: service_completed_successfully }
       redis: { condition: service_healthy }

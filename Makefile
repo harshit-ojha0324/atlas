@@ -1,6 +1,7 @@
 .PHONY: up down clean logs ps tenant test drill lint
 
-up:            ## build + start the stack (api, postgres, redis, forge + mock models)
+up:            ## build + start the stack (api, worker, postgres, redis, forge + mock models)
+	cp -n deploy/forge-tenants.example.yaml deploy/forge-tenants.yaml 2>/dev/null || true
 	docker compose up -d --build --wait
 
 down:
