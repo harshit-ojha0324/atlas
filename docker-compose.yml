@@ -8,7 +8,7 @@ x-app-env: &app-env
   REDIS_URL: redis://redis:6379/0
   FORGE_BASE_URL: http://forge:8080
 
-# Only the API and forge are published, and only on localhost.
+# Only the API, forge and Postgres (for tests) are published, and only on localhost.
 services:
   postgres:
     image: pgvector/pgvector:pg16
@@ -16,6 +16,7 @@ services:
       POSTGRES_USER: ${POSTGRES_USER:-atlas}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-atlas}
       POSTGRES_DB: ${POSTGRES_DB:-atlas}
+    ports: ["127.0.0.1:5433:5432"]  # for the isolation tests; 5433 because shrtr uses 5432
     volumes: [pgdata:/var/lib/postgresql/data]
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-atlas}"]
