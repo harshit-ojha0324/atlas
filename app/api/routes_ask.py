@@ -29,11 +29,15 @@ from app.core.answer import (
     format_history,
 )
 from app.core.retrieval import retrieve
-from app.core.security import chunk_is_injection, filter_output, is_injection, redact_pii
+from app.core.security import filter_output, is_injection, redact_pii
 from app.models import Tenant
 from app.observability.metrics import SECURITY_EVENTS
 
 log = logging.getLogger("atlas.ask")
+
+# extra passages fetched so that ones withheld by the injection screen don't
+# leave the answer with fewer than k
+OVERFETCH = 4
 router = APIRouter(tags=["ask"])
 
 
@@ -114,15 +118,18 @@ async def ask(
             question = redact_pii(rewritten.text.strip())[0] or question
 
         query_vec = await run_in_threadpool(state.embedder.embed_query, question)
-        hits = await retrieve(session, tenant_id, query_vec, body.k)
-        safe_hits = [h for h in hits if not chunk_is_injection(h.text)]
+        hits = await retrieve(session, tenant_id, query_vec, body.k + OVERFETCH)
+        safe_hits = [h for h in hits if not is_injection(h.text)]
         if len(safe_hits) < len(hits):
             dropped = sorted({f"{h.document} p{h.page}" for h in hits if h not in safe_hits})
             warnings.append(
                 f"Left out passages that contain instructions aimed at the model: {', '.join(dropped)}"
             )
             _event("chunk_dropped", tenant_id, ",".join(dropped))
-        if not safe_hits:  # nothing to ground an answer in: don't spend tokens
+        safe_hits = safe_hits[: body.k]
+        # Nothing relevant to ground an answer in: say so without spending
+        # tokens, and without handing the model unrelated text to guess from.
+        if not safe_hits or safe_hits[0].score < state.settings.ask_min_score:
             return AskOut(
                 answer=NO_CONTEXT_ANSWER,
                 question=question,

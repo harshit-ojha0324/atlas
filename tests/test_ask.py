@@ -181,3 +181,16 @@ async def test_credentials_in_the_answer_are_masked(env, forge):
     )
     out = (await ask(env, "a", "What's the key?")).json()
     assert "sk-abcdef123456789" not in out["answer"] and "[API_KEY_REDACTED]" in out["answer"]
+
+
+async def test_irrelevant_question_is_answered_without_the_llm(env, forge):
+    route, calls = forge
+    env.settings.ask_min_score = 0.5  # conftest turns the floor off; FakeEmbedder: unrelated ~0, exact 1.0
+    await env.upload("a", "alpha.pdf", [ALPHA])
+    await env.drain()
+
+    out = (await ask(env, "a", "Who won the 2018 World Cup?")).json()
+    assert out["sources"] == [] and out["forge_backend"] is None and not route.called
+
+    out = (await ask(env, "a", ALPHA)).json()
+    assert out["sources"][0]["document"] == "alpha.pdf" and len(calls) == 1

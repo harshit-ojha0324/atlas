@@ -74,7 +74,7 @@ Every LLM call goes through forge using the asking tenant's own forge key. `make
 - **The cache is per tenant.** Calls use temperature 0, so forge caches answers. Its cache key includes the tenant and the whole prompt (retrieved context included), so a re-indexed document never gets a stale answer, and one tenant's question never hits another's cached answer.
 - **Failover is free.** If the primary model dies, forge's circuit breaker sends calls to the fallback and `/ask` keeps answering.
 
-A follow-up question (`history` given) is first rewritten into a standalone question, which is then used for both retrieval and the answer: two forge calls, as the RAG app's LangChain chain did. Prompts are the RAG app's: system rules above delimited, untrusted context. If retrieval finds nothing, `/ask` says so without calling forge at all.
+A follow-up question (`history` given) is first rewritten into a standalone question, which is then used for both retrieval and the answer: two forge calls, as the RAG app's LangChain chain did. Prompts are the RAG app's: system rules above delimited, untrusted context. If nothing relevant is found, `/ask` says so without calling forge at all. "Relevant" means the best passage scores at least 0.25 (`ASK_MIN_SCORE`). On the RAG app's gold set, answerable questions scored 0.42–0.72 and unanswerable ones 0.04–0.16, so off-topic questions cost no tokens, and the model never gets unrelated text to guess from.
 
 ## Rate limits and the security layer
 
@@ -87,7 +87,9 @@ Limited responses carry `X-RateLimit-*` headers; refusals are 429 with `Retry-Af
 **Security layer on `/ask`**, ported from the RAG app:
 - **PII:** emails, phone numbers, SSNs and card numbers are redacted from the question and the history before anything reaches forge. Names are kept, since they're what people ask about.
 - **Injection:** a question that looks like a prompt injection gets a 400. A history turn that does is dropped from the history instead, so one blocked question doesn't block the conversation.
-- **Planted instructions:** retrieved passages containing instructions aimed at the model (indirect injection through an uploaded document) are left out of the prompt. This uses a narrower pattern than for questions, so policy text like "new rules take effect in May" isn't flagged.
+- **Planted instructions:** retrieved passages containing instructions aimed at the model (indirect injection through an uploaded document) are left out of the prompt. A few extra passages are fetched, so a withheld one doesn't shrink the answer's context.
+
+One injection pattern covers questions, history and passages, and it only matches text aimed at the model ("ignore all previous instructions", "system prompt", "you are now DAN"). The RAG app's broader question patterns refused ordinary questions such as "What are the new rules for expenses?" or anything mentioning someone named Dan.
 - **Credentials:** API keys, passwords and tokens in the answer are masked.
 
 Each action is reported in the response's `security_warnings` and counted in `security_events_total`. The raw text is never logged. The patterns are regex only; the RAG app also ran Presidio (spaCy's ~600 MB model), left out here to keep the image smaller.

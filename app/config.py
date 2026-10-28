@@ -17,6 +17,10 @@ class Settings(BaseSettings):
     # above forge's own 60s upstream timeout + 10s queue wait, so forge's
     # answer (or its error) always arrives before atlas gives up
     forge_timeout_s: float = 90.0
+    # /ask answers only when the best passage scores at least this (cosine).
+    # On the RAG app's gold set, answerable questions scored 0.42-0.72 and
+    # unanswerable ones 0.04-0.16; 0.25 sits in the gap.
+    ask_min_score: float = 0.25
 
     # Redis connection pool (API): blocking pool so bursts queue briefly
     # instead of erroring when all connections are checked out

@@ -5,9 +5,13 @@
   that do are dropped from the history.
 - Retrieved chunks that look like an injection are kept out of the prompt:
   indirect injection through an uploaded document, which the RAG app's regex
-  gate never checked. Document patterns are narrower than question patterns,
-  since policies routinely say "new rules" or "you are now eligible".
+  gate never checked.
 - Credentials in the answer are masked before it's returned.
+
+One injection pattern serves questions, history and chunks, and it only
+matches text aimed at the model. The RAG app's question patterns refused
+ordinary document questions ("What are the new rules for expenses?", "Can
+managers override the default settings?", anything mentioning someone named Dan).
 
 ponytail: regex only. The RAG app ran Presidio (spaCy's ~600 MB model) first
 and these same patterns as its fallback; Presidio adds checksum validation and
@@ -25,28 +29,12 @@ PII_PATTERNS = {
     "PHONE_NUMBER": re.compile(r"\b\d{3}[-.]?\d{3}[-.]?\d{4}\b"),
 }
 
-# What a *question* has no business saying (the RAG app's list, minus its SQL/XSS
-# patterns, which it dropped for blocking questions like "Which plan covers C#?").
-QUESTION_INJECTION = re.compile(
-    r"ignore .*?(instructions|prompts|rules)"
-    r"|disregard .*?(instructions|prompts|rules)"
-    r"|forget .*?(instructions|prompts|rules)"
-    r"|you are now"
-    r"|new .*?(instructions|rules|role)"
+# Instructions aimed at the model itself, not at a reader.
+INJECTION = re.compile(
+    r"(ignore|disregard|forget|override)\s+(all\s+|any\s+)?(the\s+|your\s+)?"
+    r"(previous|prior|above|earlier|system)\s+(instructions|prompts|rules)"
     r"|system prompt"
-    r"|override .*?(instructions|settings|rules)"
-    r"|jailbreak"
-    r"|do anything now"
-    r"|\bdan\b",
-    re.IGNORECASE,
-)
-
-# What a *document* has no business saying: instructions aimed at the model itself.
-DOCUMENT_INJECTION = re.compile(
-    r"(ignore|disregard|forget|override)\s+(all\s+|any\s+)?(the\s+)?(previous|prior|above|earlier|system)\s+"
-    r"(instructions|prompts|rules)"
-    r"|system prompt"
-    r"|you are (now )?(chatgpt|an? (ai|language model|assistant))"
+    r"|you are (now )?(dan|chatgpt|an? (ai|language model|assistant))\b"
     r"|do anything now"
     r"|jailbreak",
     re.IGNORECASE,
@@ -72,12 +60,8 @@ def redact_pii(text: str) -> tuple[str, list[str]]:
     return text, found
 
 
-def is_injection(question: str) -> bool:
-    return QUESTION_INJECTION.search(question) is not None
-
-
-def chunk_is_injection(text: str) -> bool:
-    return DOCUMENT_INJECTION.search(text) is not None
+def is_injection(text: str) -> bool:
+    return INJECTION.search(text) is not None
 
 
 def filter_output(text: str) -> tuple[str, list[str]]:

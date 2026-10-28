@@ -2,7 +2,7 @@
 
 import pytest
 
-from app.core.security import chunk_is_injection, filter_output, is_injection, redact_pii
+from app.core.security import filter_output, is_injection, redact_pii
 
 
 @pytest.mark.parametrize(
@@ -39,6 +39,11 @@ def test_flags_injection_in_questions(question):
         "Which plan covers C#?",
         "Is the fee 10 or 20 -- per month?",
         "Where is the onload= handler documented?",
+        # refused by the RAG app's patterns
+        "What are the new rules for expense reports?",
+        "What did Dan say about Q3?",
+        "Can managers override the default settings?",
+        "Do I need to forget the old travel rules?",
     ],
 )
 def test_allows_ordinary_questions(question):
@@ -54,7 +59,7 @@ def test_allows_ordinary_questions(question):
     ],
 )
 def test_flags_injection_planted_in_documents(chunk):
-    assert chunk_is_injection(chunk)
+    assert is_injection(chunk)
 
 
 @pytest.mark.parametrize(
@@ -67,7 +72,7 @@ def test_flags_injection_planted_in_documents(chunk):
     ],
 )
 def test_ordinary_policy_text_is_not_mistaken_for_injection(chunk):
-    assert not chunk_is_injection(chunk)
+    assert not is_injection(chunk)
 
 
 def test_masks_credentials_in_output():

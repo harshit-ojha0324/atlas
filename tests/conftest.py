@@ -102,7 +102,8 @@ async def env(database):
             session.add(ApiKey(tenant_id=tenant.id, key_hash=deps.hash_key(keys[name]), name="test"))
         await session.commit()
 
-    settings = Settings(worker_reclaim_min_idle_ms=0)
+    # FakeEmbedder scores unrelated text near 0, so tests opt out of the relevance floor
+    settings = Settings(worker_reclaim_min_idle_ms=0, ask_min_score=-1.0)
     redis = fakeredis.FakeAsyncRedis(decode_responses=True)
     app = create_app()  # no lifespan under ASGITransport: wire state by hand
     app.state.settings = settings
