@@ -11,15 +11,15 @@ MODEL = "sentence-transformers/all-MiniLM-L6-v2"
 
 
 class Embedder:
-    def __init__(self, model_name: str = MODEL):
+    def __init__(self):
         # imported here: sentence-transformers pulls in torch, which tests
         # using a fake embedder never need to load
         from sentence_transformers import SentenceTransformer
 
-        self.model = SentenceTransformer(model_name, device="cpu")
+        self.model = SentenceTransformer(MODEL, device="cpu")
         dim = self.model.get_embedding_dimension()
         if dim != EMBEDDING_DIM:
-            raise RuntimeError(f"{model_name} makes {dim}-d vectors; chunks.embedding is {EMBEDDING_DIM}-d")
+            raise RuntimeError(f"{MODEL} makes {dim}-d vectors; chunks.embedding is {EMBEDDING_DIM}-d")
 
     def embed_documents(self, texts: list[str]) -> list[list[float]]:
         texts = [t.replace("\n", " ") for t in texts]  # as LangChain's HuggingFaceEmbeddings did

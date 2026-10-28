@@ -7,7 +7,6 @@ tenant can ask questions within half a minute.
 """
 
 import asyncio
-import os
 import secrets
 import sys
 
@@ -16,8 +15,8 @@ from app.config import get_settings
 from app.db.session import make_engine, make_sessionmaker
 from app.models import ApiKey, Tenant
 
-FORGE_TENANTS_FILE = os.environ.get("FORGE_TENANTS_FILE", "deploy/forge-tenants.yaml")
-FORGE_DAILY_TOKEN_QUOTA = int(os.environ.get("FORGE_DAILY_TOKEN_QUOTA", "200000"))
+FORGE_TENANTS_FILE = "deploy/forge-tenants.yaml"
+FORGE_DAILY_TOKEN_QUOTA = 200_000
 
 
 async def main(name: str) -> None:

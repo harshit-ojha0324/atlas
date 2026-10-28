@@ -2,7 +2,7 @@
 name = "atlas"
 version = "0.1.0"
 description = "Multi-tenant RAG platform: async ingestion over Redis Streams, pgvector retrieval, answers through the forge LLM gateway, exposed over MCP"
-requires-python = ">=3.11"
+requires-python = ">=3.12"  # math.sumprod
 dependencies = [
     "fastapi>=0.111",
     "uvicorn[standard]>=0.30",
@@ -44,7 +44,7 @@ asyncio_default_fixture_loop_scope = "function"
 
 [tool.ruff]
 line-length = 110
-target-version = "py311"
+target-version = "py312"
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "W"]

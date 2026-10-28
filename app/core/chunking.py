@@ -33,15 +33,6 @@ class DocumentTooLarge(ValueError):
     pass
 
 
-def cosine(a: list[float], b: list[float]) -> float:
-    dot = sum(x * y for x, y in zip(a, b))
-    na = math.sqrt(sum(x * x for x in a))
-    nb = math.sqrt(sum(y * y for y in b))
-    if na == 0 or nb == 0:
-        return 0.0
-    return dot / (na * nb)
-
-
 class SemanticChunker:
     """Starts a new chunk wherever the cosine distance between consecutive
     sentences is in the top percentile, i.e. at a topic shift. Falls back to
@@ -69,7 +60,8 @@ class SemanticChunker:
             logger.warning(f"Sentence embedding failed ({e}); using plain splitting for this page")
             return self._fallback(text)
 
-        distances = [1.0 - cosine(vectors[i], vectors[i + 1]) for i in range(len(vectors) - 1)]
+        # embedders return unit vectors, so cosine similarity is the dot product
+        distances = [1.0 - math.sumprod(vectors[i], vectors[i + 1]) for i in range(len(vectors) - 1)]
         threshold = statistics.quantiles(distances, n=100, method="inclusive")[BREAKPOINT_PERCENTILE - 1]
 
         chunks: list[str] = []

@@ -1,13 +1,11 @@
-from dataclasses import dataclass
-
+from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models import Chunk, Document
 
 
-@dataclass
-class Hit:
+class Hit(BaseModel):
     document_id: int
     document: str
     page: int
@@ -29,4 +27,7 @@ async def retrieve(session: AsyncSession, tenant_id: int, query_vec: list[float]
         .order_by(distance)
         .limit(k)
     )
-    return [Hit(doc_id, name, page, text, 1.0 - dist) for doc_id, name, page, text, dist in rows]
+    return [
+        Hit(document_id=doc_id, document=name, page=page, text=text, score=1.0 - dist)
+        for doc_id, name, page, text, dist in rows
+    ]

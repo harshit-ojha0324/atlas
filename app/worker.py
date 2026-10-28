@@ -255,7 +255,6 @@ class IngestWorker:
     async def step(self, sweep: bool, block_ms: int | None) -> int:
         """One loop iteration; returns how many entries it handled."""
         entries = await self.retry_pending() if sweep else []
-        handled_ids = {e[0] for e in entries}
         resp = await self.redis.xreadgroup(
             self.settings.stream_group,
             self.name,
@@ -263,8 +262,8 @@ class IngestWorker:
             count=1,  # documents are heavy: one at a time, so a reclaim never steals a queue of them
             block=block_ms,
         )
-        if resp:
-            entries += [e for e in resp[0][1] if e[0] not in handled_ids]
+        if resp:  # ">" returns only never-delivered entries, so none repeat the sweep's
+            entries += resp[0][1]
         for entry_id, fields in entries:
             await self.handle(entry_id, fields)
         return len(entries)

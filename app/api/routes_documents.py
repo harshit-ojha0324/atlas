@@ -15,8 +15,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from starlette.concurrency import run_in_threadpool
 
 from app.api.deps import get_session, limit_queries, limit_uploads, require_tenant
-from app.core.queue import enqueue
-from app.core.retrieval import retrieve
+from app.core.retrieval import Hit, retrieve
 from app.models import Document
 
 router = APIRouter(tags=["documents"])
@@ -36,14 +35,6 @@ class DocumentOut(BaseModel):
 class SearchRequest(BaseModel):
     query: str = Field(min_length=1, max_length=2000)
     k: int = Field(default=4, ge=1, le=20)
-
-
-class HitOut(BaseModel):
-    document_id: int
-    document: str
-    page: int
-    text: str
-    score: float
 
 
 def _out(doc: Document) -> DocumentOut:
@@ -98,7 +89,11 @@ async def upload_document(
     session.add(doc)
     await session.commit()
     try:
-        await enqueue(request.app.state.redis, request.app.state.settings, doc.id)
+        settings = request.app.state.settings
+        # the worker (app/worker.py) consumes this stream
+        await request.app.state.redis.xadd(
+            settings.stream_key, {"doc_id": str(doc.id)}, maxlen=settings.stream_maxlen, approximate=True
+        )
     except RedisError:
         # a row nobody will ever process is worse than a failed upload
         await session.delete(doc)
@@ -149,7 +144,6 @@ async def search(
     request: Request,
     tenant_id: int = Depends(limit_queries),
     session: AsyncSession = Depends(get_session),
-) -> list[HitOut]:
+) -> list[Hit]:
     query_vec = await run_in_threadpool(request.app.state.embedder.embed_query, body.query)
-    hits = await retrieve(session, tenant_id, query_vec, body.k)
-    return [HitOut(**h.__dict__) for h in hits]
+    return await retrieve(session, tenant_id, query_vec, body.k)
