@@ -23,7 +23,7 @@ curl localhost:8000/readyz   # {"redis":"ok","postgres":"ok","forge":"ok"}
 | atlas API | 8000 |
 | forge gateway | 8081 |
 
-Create a tenant (the API key is printed once), then upload and search:
+Create a tenant (the API key is printed once; forge accepts the tenant within 30s), then upload, search and ask:
 
 ```bash
 make tenant NAME=acme
@@ -31,6 +31,8 @@ curl -H "X-API-Key: $KEY" -F file=@handbook.pdf localhost:8000/documents
 curl -H "X-API-Key: $KEY" localhost:8000/documents
 curl -H "X-API-Key: $KEY" -H 'content-type: application/json' \
      -d '{"query": "how many vacation days?", "k": 4}' localhost:8000/search
+curl -H "X-API-Key: $KEY" -H 'content-type: application/json' \
+     -d '{"question": "how many vacation days?"}' localhost:8000/ask
 ```
 
 | Endpoint | What it does |
@@ -40,6 +42,9 @@ curl -H "X-API-Key: $KEY" -H 'content-type: application/json' \
 | `GET /documents` | This tenant's documents, every version. |
 | `DELETE /documents/{id}` | Delete one; another tenant's id gets the same 404 as a missing one. |
 | `POST /search` | The `k` nearest chunks (default 4, max 20) from this tenant's documents, with page and cosine score. |
+| `POST /ask` | Answer `question` from this tenant's documents, with sources. Optional `history` (`[{role, content}]`) makes it a follow-up. The response says which model answered (`forge_backend`: `vllm`, `gemini` or `cache`). |
+
+The local stack runs forge with mock models, so answers are placeholder text. Point forge's fallback at a real model (`FORGE_FALLBACK_BASE_URL`, `FORGE_FALLBACK_API_KEY`, `FORGE_FALLBACK_MODEL` on the `forge` service) to get real ones.
 
 Tests: `pip install -e '.[dev]' && make test`. The tenant-isolation tests run against the stack's Postgres (published on `127.0.0.1:5433`) in a separate `atlas_test` database, and skip if it isn't up.
 
@@ -61,6 +66,16 @@ Uploads go onto a Redis Stream; `app/worker.py` (a consumer group, ported from s
 
 `make drill` proves the crash path on the live stack. It SIGKILLs the worker mid-document, restarts it, and checks the document lands exactly once. Last run: 300 pages, 560 chunks; the restarted worker finished in 25s; no duplicates; 2 attempts recorded; nothing left pending or dead-lettered.
 
+## Answers through forge
+
+Every LLM call goes through forge using the asking tenant's own forge key. `make tenant` creates that key and appends the tenant to forge's tenants file (`deploy/forge-tenants.yaml`, a gitignored copy of the `.example`), which forge re-reads every 30s. Because forge sees each atlas tenant as its own tenant:
+
+- **Quotas and fair queueing are per tenant.** One tenant flooding `/ask` is shed by forge without slowing the others. forge's 429 is passed on with its `Retry-After`.
+- **The cache is per tenant.** Calls use temperature 0, so forge caches answers. Its cache key includes the tenant and the whole prompt (retrieved context included), so a re-indexed document never gets a stale answer, and one tenant's question never hits another's cached answer.
+- **Failover is free.** If the primary model dies, forge's circuit breaker sends calls to the fallback and `/ask` keeps answering.
+
+A follow-up question (`history` given) is first rewritten into a standalone question, which is then used for both retrieval and the answer: two forge calls, as the RAG app's LangChain chain did. Prompts are the RAG app's: system rules above delimited, untrusted context. If retrieval finds nothing, `/ask` says so without calling forge at all.
+
 ## Readiness
 
 `/readyz` returns 503 when Postgres or Redis is down. forge is reported but never fails readiness: without it, questions fail, but uploads and listing still work.
@@ -70,7 +85,7 @@ Uploads go onto a Redis Stream; `app/worker.py` (a consumer group, ported from s
 - [x] **Phase 0:** skeleton: API, pgvector, Redis, forge + mock models in one compose stack
 - [x] **Phase 1:** tenants, API keys, chunks table; synchronous upload and tenant-scoped retrieval
 - [x] **Phase 2:** background ingestion over Redis Streams (worker, dead-letter queue, kill-the-worker drill)
-- [ ] **Phase 3:** all LLM calls through forge, one forge key per tenant
+- [x] **Phase 3:** all LLM calls through forge, one forge key per tenant
 - [ ] **Phase 4:** token-bucket rate limits and the security layer
 - [ ] **Phase 5:** MCP server (`search_documents`, `ask`, `list_documents`)
 - [ ] **Phase 6:** evals, failure drills and benchmarks gated in CI
