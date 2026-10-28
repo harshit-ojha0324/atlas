@@ -6,7 +6,7 @@ from fastapi.responses import PlainTextResponse
 from prometheus_client import CONTENT_TYPE_LATEST, generate_latest
 from redis.asyncio import BlockingConnectionPool, Redis
 
-from app.api import routes_documents, routes_health
+from app.api import routes_ask, routes_documents, routes_health
 from app.config import get_settings
 from app.core.embeddings import Embedder
 from app.db.session import make_engine, make_sessionmaker
@@ -30,7 +30,9 @@ def create_app() -> FastAPI:
             )
         )
         # one shared client for every forge call, like forge's own gateway
-        app.state.forge = httpx.AsyncClient(base_url=settings.forge_base_url, timeout=60.0)
+        app.state.forge = httpx.AsyncClient(
+            base_url=settings.forge_base_url, timeout=settings.forge_timeout_s
+        )
         app.state.embedder = Embedder()
         yield
         await app.state.forge.aclose()
@@ -46,6 +48,7 @@ def create_app() -> FastAPI:
 
     app.include_router(routes_health.router)
     app.include_router(routes_documents.router)
+    app.include_router(routes_ask.router)
     return app
 
 

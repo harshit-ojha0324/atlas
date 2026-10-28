@@ -25,6 +25,7 @@ from app.models import ApiKey, Tenant
 from app.worker import IngestWorker
 
 ROOT = Path(__file__).resolve().parents[1]
+FORGE = "http://forge.test"
 TEST_DB = os.environ.get("TEST_DATABASE_URL", "postgresql+asyncpg://atlas:atlas@127.0.0.1:5433/atlas_test")
 
 
@@ -93,7 +94,7 @@ async def env(database):
     keys = {}
     async with sessions() as session:
         for name in ("a", "b"):
-            tenant = Tenant(name=name)
+            tenant = Tenant(name=name, forge_api_key=f"forge-{name}")
             session.add(tenant)
             await session.flush()
             keys[name] = f"key-{name}"
@@ -108,6 +109,8 @@ async def env(database):
     app.state.sessionmaker = sessions
     app.state.embedder = FakeEmbedder()
     app.state.redis = redis
+    app.state.forge = httpx.AsyncClient(base_url=FORGE)  # tests mock it with respx
     async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://t") as client:
         yield Env(client, sessions, redis, settings, keys)
+    await app.state.forge.aclose()
     await engine.dispose()
