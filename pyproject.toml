@@ -18,7 +18,7 @@ dependencies = [
     "pgvector>=0.3",
     "pypdf>=5.0",
     # pulls in torch; the Dockerfile installs the CPU-only build first
-    "sentence-transformers>=3.0",
+    "sentence-transformers>=6.0",
 ]
 
 [project.optional-dependencies]

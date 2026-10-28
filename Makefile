@@ -1,4 +1,4 @@
-.PHONY: up down clean logs ps tenant test lint
+.PHONY: up down clean logs ps tenant test drill lint
 
 up:            ## build + start the stack (api, postgres, redis, forge + mock models)
 	docker compose up -d --build --wait
@@ -10,7 +10,7 @@ clean:         ## down + wipe the postgres volume
 	docker compose down -v
 
 logs:
-	docker compose logs -f api forge
+	docker compose logs -f api worker forge
 
 ps:
 	docker compose ps
@@ -20,6 +20,9 @@ tenant:        ## create a tenant and print its API key once: make tenant NAME=a
 
 test:          ## all tests; the isolation tests need `make up` (Postgres on 5433) and skip without it
 	pytest -q
+
+drill:         ## SIGKILL the worker mid-ingest, restart it, check the document lands exactly once
+	python scripts/drill_kill_worker.py
 
 lint:
 	ruff check . && ruff format --check .

@@ -17,7 +17,7 @@ class Embedder:
         from sentence_transformers import SentenceTransformer
 
         self.model = SentenceTransformer(model_name, device="cpu")
-        dim = self.model.get_sentence_embedding_dimension()
+        dim = self.model.get_embedding_dimension()
         if dim != EMBEDDING_DIM:
             raise RuntimeError(f"{model_name} makes {dim}-d vectors; chunks.embedding is {EMBEDDING_DIM}-d")
 
