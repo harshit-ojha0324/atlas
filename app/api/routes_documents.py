@@ -14,7 +14,7 @@ from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from starlette.concurrency import run_in_threadpool
 
-from app.api.deps import get_session, require_tenant
+from app.api.deps import get_session, limit_queries, limit_uploads, require_tenant
 from app.core.queue import enqueue
 from app.core.retrieval import retrieve
 from app.models import Document
@@ -62,7 +62,7 @@ async def upload_document(
     request: Request,
     response: Response,
     file: UploadFile = File(...),
-    tenant_id: int = Depends(require_tenant),
+    tenant_id: int = Depends(limit_uploads),
     session: AsyncSession = Depends(get_session),
 ) -> DocumentOut:
     # only the base name: a client-supplied path never reaches storage or listings
@@ -147,7 +147,7 @@ async def delete_document(
 async def search(
     body: SearchRequest,
     request: Request,
-    tenant_id: int = Depends(require_tenant),
+    tenant_id: int = Depends(limit_queries),
     session: AsyncSession = Depends(get_session),
 ) -> list[HitOut]:
     query_vec = await run_in_threadpool(request.app.state.embedder.embed_query, body.query)

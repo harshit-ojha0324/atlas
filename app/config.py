@@ -23,6 +23,13 @@ class Settings(BaseSettings):
     redis_max_connections: int = 200
     redis_pool_timeout_s: float = 2.0
 
+    # Token buckets per tenant (shrtr's limiter). Uploads are expensive (CPU on
+    # the worker); queries cover /search and /ask, whose LLM tokens forge meters too.
+    rate_upload_capacity: int = 10
+    rate_upload_refill_per_s: float = 0.2  # 12 a minute sustained
+    rate_query_capacity: int = 30
+    rate_query_refill_per_s: float = 1.0
+
     # DB pool
     db_pool_size: int = 10
 

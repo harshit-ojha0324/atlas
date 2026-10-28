@@ -19,6 +19,7 @@ from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
 from app.api import deps
 from app.config import Settings
+from app.core.ratelimit import RateLimiter
 from app.db.session import make_sessionmaker
 from app.main import create_app
 from app.models import ApiKey, Tenant
@@ -109,6 +110,7 @@ async def env(database):
     app.state.sessionmaker = sessions
     app.state.embedder = FakeEmbedder()
     app.state.redis = redis
+    app.state.rate_limiter = RateLimiter(redis)
     app.state.forge = httpx.AsyncClient(base_url=FORGE)  # tests mock it with respx
     async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://t") as client:
         yield Env(client, sessions, redis, settings, keys)

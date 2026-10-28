@@ -9,6 +9,7 @@ from redis.asyncio import BlockingConnectionPool, Redis
 from app.api import routes_ask, routes_documents, routes_health
 from app.config import get_settings
 from app.core.embeddings import Embedder
+from app.core.ratelimit import RateLimiter
 from app.db.session import make_engine, make_sessionmaker
 from app.observability.metrics import latency_middleware
 
@@ -29,6 +30,7 @@ def create_app() -> FastAPI:
                 decode_responses=True,
             )
         )
+        app.state.rate_limiter = RateLimiter(app.state.redis)
         # one shared client for every forge call, like forge's own gateway
         app.state.forge = httpx.AsyncClient(
             base_url=settings.forge_base_url, timeout=settings.forge_timeout_s

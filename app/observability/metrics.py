@@ -12,6 +12,9 @@ REQUEST_LATENCY = Histogram(
     buckets=[0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1.0, 2.0, 5.0, 10.0],
 )
 API_ERRORS = Counter("api_errors_total", "Unhandled API errors", ["route"])
+RATE_LIMIT_DECISIONS = Counter("rate_limit_decisions_total", "Token bucket decisions", ["bucket", "allowed"])
+# pii_redacted | injection_blocked | history_turn_dropped | chunk_dropped | output_filtered
+SECURITY_EVENTS = Counter("security_events_total", "Security layer actions on /ask", ["kind"])
 
 
 async def latency_middleware(request: Request, call_next):
