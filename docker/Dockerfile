@@ -1,14 +1,23 @@
 # Multi-stage build shared by the API and (from Phase 2) the worker.
 FROM python:3.12-slim AS builder
+RUN python -m venv /venv
+ENV PATH=/venv/bin:$PATH
+# CPU-only torch first: plain `pip install torch` on x86 pulls the CUDA build (GBs)
+RUN pip install --no-cache-dir torch --index-url https://download.pytorch.org/whl/cpu
 WORKDIR /build
 COPY pyproject.toml ./
 COPY app ./app
-RUN pip install --no-cache-dir --prefix=/install .
+RUN pip install --no-cache-dir .
 
 FROM python:3.12-slim
 RUN useradd --create-home --uid 10001 atlas
+COPY --from=builder /venv /venv
+ENV PATH=/venv/bin:$PATH HF_HOME=/opt/hf
+# Bake the embedding model into the image so startup never downloads it.
+RUN python -c "from sentence_transformers import SentenceTransformer; \
+SentenceTransformer('sentence-transformers/all-MiniLM-L6-v2')"
+ENV HF_HUB_OFFLINE=1
 WORKDIR /app
-COPY --from=builder /install /usr/local
 COPY app ./app
 COPY migrations ./migrations
 COPY alembic.ini ./alembic.ini

@@ -23,7 +23,24 @@ curl localhost:8000/readyz   # {"redis":"ok","postgres":"ok","forge":"ok"}
 | atlas API | 8000 |
 | forge gateway | 8081 |
 
-Unit tests need no Docker: `pip install -e '.[dev]' && make test`.
+Create a tenant (the API key is printed once), then upload and search:
+
+```bash
+make tenant NAME=acme
+curl -H "X-API-Key: $KEY" -F file=@handbook.pdf localhost:8000/documents
+curl -H "X-API-Key: $KEY" localhost:8000/documents
+curl -H "X-API-Key: $KEY" -H 'content-type: application/json' \
+     -d '{"query": "how many vacation days?", "k": 4}' localhost:8000/search
+```
+
+| Endpoint | What it does |
+|---|---|
+| `POST /documents` | Upload a PDF (max 10 MB). Returns 201 once it's chunked, embedded and stored; 200 if the same bytes were already indexed under that name. Changed bytes under the same name replace the old version. |
+| `GET /documents` | This tenant's documents. |
+| `DELETE /documents/{id}` | Delete one; another tenant's id gets the same 404 as a missing one. |
+| `POST /search` | The `k` nearest chunks (default 4, max 20) from this tenant's documents, with page and cosine score. |
+
+Tests: `pip install -e '.[dev]' && make test`. The tenant-isolation tests run against the stack's Postgres (published on `127.0.0.1:5433`) in a separate `atlas_test` database, and skip if it isn't up.
 
 ## Why Postgres + pgvector, not Chroma
 
@@ -36,7 +53,7 @@ A document's chunks and its `ready` status must commit in one transaction. That'
 ## Roadmap
 
 - [x] **Phase 0:** skeleton: API, pgvector, Redis, forge + mock models in one compose stack
-- [ ] **Phase 1:** tenants, API keys, chunks table; synchronous upload and tenant-scoped retrieval
+- [x] **Phase 1:** tenants, API keys, chunks table; synchronous upload and tenant-scoped retrieval
 - [ ] **Phase 2:** background ingestion over Redis Streams (worker, dead-letter queue, kill-the-worker drill)
 - [ ] **Phase 3:** all LLM calls through forge, one forge key per tenant
 - [ ] **Phase 4:** token-bucket rate limits and the security layer
