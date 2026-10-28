@@ -1,4 +1,4 @@
-.PHONY: up down clean logs ps tenant test drill lint
+.PHONY: up down clean logs ps tenant test drill drill-fairness lint
 
 up:            ## build + start the stack (api, worker, postgres, redis, forge + mock models)
 	cp -n deploy/forge-tenants.example.yaml deploy/forge-tenants.yaml 2>/dev/null || true
@@ -24,6 +24,9 @@ test:          ## all tests; the isolation tests need `make up` (Postgres on 543
 
 drill:         ## SIGKILL the worker mid-ingest, restart it, check the document lands exactly once
 	python scripts/drill_kill_worker.py
+
+drill-fairness: ## one tenant's backlog must delay another tenant's upload by ~one document, not all of it
+	python scripts/drill_noisy_neighbour.py
 
 lint:
 	ruff check . && ruff format --check .

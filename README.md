@@ -54,7 +54,9 @@ A document's chunks and its `ready` status must commit in one transaction. That'
 
 ## Ingestion worker
 
-Uploads go onto a Redis Stream; `app/worker.py` (a consumer group, ported from shrtr's analytics worker) does the parsing, chunking and embedding.
+Uploads go onto Redis Streams; `app/worker.py` (a consumer group, ported from shrtr's analytics worker) does the parsing, chunking and embedding.
+
+- **Fair across tenants.** Each tenant has its own stream (`ingest:<tenant_id>`). A worker takes its next document from the first tenant after the last one it served that has work waiting, so one tenant's backlog delays another tenant by at most one document per worker. This is forge's per-tenant queueing, in plain round-robin. It's fair by document, not by work: one huge PDF still holds a worker until it finishes.
 
 - **Effectively once.** A document's chunks and its `ready` status commit in one transaction, under a row lock that backs off unless the row is still `pending`. The worker acknowledges the stream entry only after that commit, so a crash in between redelivers an entry that is then skipped.
 - **Crash recovery.** A restarted worker comes back as the same consumer and resumes the entries it held. Entries held by a worker that never comes back are claimed by another worker after 2 minutes idle.
@@ -63,6 +65,8 @@ Uploads go onto a Redis Stream; `app/worker.py` (a consumer group, ported from s
   - A bad PDF (unreadable, no text, over 2,000 chunks) is marked `failed` with the reason.
   - An unexpected error while Postgres is up is marked `failed` and dead-lettered to `ingest:dlq`. While Postgres is down, nothing is dead-lettered; entries wait.
   - A document that kills the worker outright (OOM, segfault) raises nothing to catch. Each attempt is committed to `documents.attempts` *before* any work, so after 3 attempts that never finished, the next delivery dead-letters it. Redis's own delivery count can't do this: it also climbs during a Postgres outage. This counter can't, since bumping it needs Postgres.
+
+`make drill-fairness` proves the fairness: tenant A queues six large PDFs, then tenant B uploads one page. Before per-tenant streams, B waited 44.2s for A's whole backlog. Now it waits 6.8s, just for A's document already in progress.
 
 `make drill` proves the crash path on the live stack. It SIGKILLs the worker mid-document, restarts it, and checks the document lands exactly once. Last run: 300 pages, 560 chunks; the restarted worker finished in 25s; no duplicates; 2 attempts recorded; nothing left pending or dead-lettered.
 
