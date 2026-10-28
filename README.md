@@ -1,6 +1,6 @@
 # atlas
 
-A multi-tenant RAG platform. Each tenant uploads PDFs and asks questions about them. Uploads are chunked and embedded by background workers that survive crashes and share time fairly between tenants. Answers come from an LLM gateway with per-tenant quotas, caching and failover. Every tenant's data, rate limits, quotas and cache are isolated from every other tenant's.
+A multi-tenant RAG platform. Each tenant uploads PDFs and asks questions about them, over HTTP or as MCP tools any agent can use. Uploads are chunked and embedded by background workers that survive crashes and share time fairly between tenants. Answers come from an LLM gateway with per-tenant quotas, caching and failover. Every tenant's data, rate limits, quotas and cache are isolated from every other tenant's.
 
 It's built almost entirely from four earlier projects, reusing patterns that were already proven there:
 
@@ -9,7 +9,7 @@ It's built almost entirely from four earlier projects, reusing patterns that wer
 | LLM calls: circuit-breaker failover, per-tenant quotas, fair queueing, response cache | [forge](https://github.com/harshit-ojha0324/forge), run as a service |
 | App layout, token-bucket rate limiting, Redis Streams worker with effectively-once processing | [shrtr](https://github.com/harshit-ojha0324/shrtr) |
 | PDF parsing, semantic chunking, prompt templates, PII/injection security layer, eval set | [Gemini-Powered-RAG-System](https://github.com/harshit-ojha0324/Gemini-Powered-RAG-System) |
-| MCP server pattern (Phase 5) | [smart-city-navigator](https://github.com/harshit-ojha0324/smart-city-navigator) |
+| MCP server pattern | [smart-city-navigator](https://github.com/harshit-ojha0324/smart-city-navigator) |
 
 The only new concept is pgvector: one column type, one distance operator.
 
@@ -37,6 +37,9 @@ The only new concept is pgvector: one column type, one distance operator.
                          │ → parse → semantic-chunk → embed (MiniLM, CPU)    │
                          │ → commit chunks + `ready` in one transaction → ACK│
                          └───────────────────────────────────────────────────┘
+
+ MCP client (navigator agent, Claude Code, Claude Desktop)
+   └─▶ atlas MCP server (one tenant's key) ── search_documents / ask / list_documents ──▶ the REST API above
 ```
 
 ## Run it
@@ -53,6 +56,7 @@ curl localhost:8000/readyz   # {"redis":"ok","postgres":"ok","forge":"ok"}
 | atlas API | 8000 | |
 | forge gateway | 8081 | forge's own standalone stack uses 8080 |
 | Postgres | 5433 (localhost only) | for the tests; shrtr uses 5432 |
+| MCP server (`make mcp`) | 8090 (localhost only) | the navigator's servers use 8071–8073 |
 
 Create a tenant (the API key is printed once; forge accepts the tenant within 30s), then upload, search and ask:
 
@@ -80,6 +84,7 @@ curl -H "X-API-Key: $KEY" -H 'content-type: application/json' \
 |---|---|
 | `make up` / `down` / `clean` | Start the stack / stop it / stop it and wipe Postgres |
 | `make tenant NAME=…` | Create a tenant, its atlas key (printed once) and its forge key |
+| `make mcp KEY=…` | Serve that tenant's documents over MCP at `localhost:8090/mcp` |
 | `make test` | All tests (`pip install -e '.[dev]'` first) |
 | `make drill` | Kill-the-worker drill (needs the stack) |
 | `make drill-fairness` | Noisy-neighbour drill (needs the stack) |
@@ -152,19 +157,46 @@ One injection pattern covers questions, history and passages, and it only matche
 
 Each action is reported in the response's `security_warnings` and counted in `security_events_total`; the raw text is never logged. The patterns are regex only. The RAG app also ran Presidio (spaCy's ~600 MB model) first; it's left out to keep the image smaller and can be swapped in behind `redact_pii`.
 
+### MCP server
+
+`app/mcp_server.py` exposes one tenant's documents as three MCP tools, using the navigator's pattern: the `mcp` SDK's `MCPServer` over streamable HTTP.
+
+| Tool | Calls | Returns |
+|---|---|---|
+| `list_documents()` | `GET /documents` | every version, with status, pages and chunks |
+| `search_documents(query, k=4)` | `POST /search` | the nearest passages, with document, page and score |
+| `ask(question)` | `POST /ask` | the answer, its sources and any security warnings |
+
+- **A thin client of the REST API.** It runs with one tenant's atlas API key and sends every call through the API. Tenant isolation, rate limits, the security layer, the relevance floor and forge therefore all apply exactly as they do over HTTP, and the server needs no MCP auth of its own. The flip side: whoever can reach it acts as that tenant, so it binds to localhost. Serving many tenants from one server would need per-caller MCP auth; that's not needed while each tenant runs its own.
+- **Refusals the model can read.** API errors become `ToolError`s carrying the API's reason, so the calling model sees "atlas returned 400: question blocked: it looks like a prompt injection" or "429: query rate limit exceeded. Retry after 7s", not a bare "Error executing tool". If the API is down, it says so.
+- **`ask` takes only a standalone question.** The calling agent already holds the conversation, so it should name the subject instead of passing `history`. The REST API still accepts `history`.
+
+Connect it to:
+- **The stack:** `make mcp KEY=atlas_...` serves on `http://localhost:8090/mcp`.
+- **Claude Code:** `claude mcp add --transport http atlas http://localhost:8090/mcp`
+- **Clients that launch the server themselves** (stdio, e.g. Claude Desktop):
+  ```json
+  {"mcpServers": {"atlas": {
+    "command": "/path/to/atlas/.venv/bin/python",
+    "args": ["-m", "app.mcp_server", "--stdio"],
+    "env": {"ATLAS_API_KEY": "atlas_...", "ATLAS_API_URL": "http://localhost:8000"}}}}
+  ```
+- **The navigator's agent:** add `"atlas": "http://127.0.0.1:8090/mcp"` to the server URLs passed to its `load_tools`.
+
 ### Readiness
 
 `/readyz` returns 503 when Postgres or Redis is down. forge is reported but never fails readiness: without it, questions fail, but uploads and listing still work.
 
 ## How it's proven
 
-60 tests (`make test`). Most run against real Postgres + pgvector in a separate `atlas_test` database, with fakeredis and the worker run in-process. A fake embedder maps identical text to identical vectors, so a query equal to a chunk's text is that chunk's exact nearest neighbour.
+64 tests (`make test`). Most run against real Postgres + pgvector in a separate `atlas_test` database, with fakeredis and the worker run in-process. A fake embedder maps identical text to identical vectors, so a query equal to a chunk's text is that chunk's exact nearest neighbour.
 
 | Test file | What it proves |
 |---|---|
 | `test_isolation.py` | A tenant never sees another tenant's chunks, even when the other tenant holds the exact nearest neighbour. Listing, getting and deleting are tenant-scoped. Re-uploads are idempotent, and the old version stays searchable until the new one is ready. |
 | `test_worker.py` | A redelivery after commit changes nothing. A restarted worker resumes the document it died holding. A document that keeps killing workers is dead-lettered. A bad PDF fails without being dead-lettered. An unexpected error is dead-lettered. An older upload finishing last is discarded. Redis down at upload leaves no orphan. One tenant's backlog doesn't delay another tenant's document. |
 | `test_ask.py` | forge gets the tenant's own key, temperature 0 and only that tenant's context. Follow-ups are rewritten, then retrieved. No documents or no relevant passage means no forge call. forge failures map to honest statuses. PII never reaches forge. Injected questions are refused, and injected history turns dropped. Planted passages are left out. Credentials in answers are masked. |
+| `test_mcp_server.py` | The MCP tools, called in-process against the real API as the navigator tests its servers. The server sees only its own tenant's documents, `ask` goes through forge as that tenant, and API refusals reach the model as readable tool errors. So do an unreachable API and a missing key. |
 | `test_ratelimit.py` | Buckets are per tenant and per kind (upload vs query); Redis down pauses uploads, not queries. |
 | `test_security.py` | The ported patterns, including the ordinary questions and policy text they must *not* flag. |
 | `test_chunking.py`, `test_health.py` | Fallback splitter limits; readiness gates on Postgres and Redis, not forge. |
@@ -242,6 +274,21 @@ What each phase built, the decisions that shaped it, and what was measured live.
   - Uploads 10–12 of a burst got 429.
   - Rate-limit headers and both new metrics appeared.
 
+### Phase 5: MCP server
+- **Built:** `search_documents`, `ask` and `list_documents` on the navigator's `MCPServer` pattern, as a thin client of the REST API; streamable HTTP (`make mcp`) or stdio (`--stdio`).
+- **Decisions:**
+  - Each MCP server runs with one tenant's key and adds no auth of its own, so it binds to localhost only.
+  - API errors map to `ToolError` so the model can read the reason.
+  - `ask` takes no history; the calling agent holds the conversation.
+- **Verified live** with the navigator's own MCP client (`load_tools`) over real streamable HTTP:
+  - It found all three tools.
+  - `list_documents` showed the handbook (ready, 10 chunks).
+  - `search_documents("parental leave")` ranked the parental-leave page first (0.64).
+  - `ask` answered through forge, with sources.
+  - An injected question came back as "atlas returned 400: question blocked …".
+  - An off-topic question got "I couldn't find anything about that in your documents".
+- **Also verified over stdio:** launched as a subprocess, it listed its tools, and `search_documents("password requirements")` returned the password-policy page (0.71).
+
 ### Ponytail audit
 A repo-wide pass for code that does nothing or repeats itself. It found 7 cuts, all applied:
 
@@ -279,6 +326,7 @@ A pass over every design decision so far, asking whether something could work be
 | `/ask` | No streaming | forge supports it; the navigator's SSE pattern fits |
 | Security | Regex only; a 10-digit number like an order id is redacted as a phone number | Swap Presidio in behind `redact_pii` if precision matters |
 | Tenants | forge keys stored in plain text (forge's file has them in plain text too); no delete-tenant command, so a deleted tenant's forge key would stay in forge's file | Add `make delete-tenant`; on GKE, forge's tenants come from a Secret |
+| MCP | One server per tenant; whoever can reach it acts as that tenant | Keep it on localhost; per-caller MCP auth to serve many tenants from one server |
 | API | A missing API key returns 422 (shrtr behaves the same), not 401 | Make the header optional and return 401 |
 | Auth | A deleted key keeps working for up to 60s per API replica (key cache) | Fine until keys can be revoked |
 
@@ -289,6 +337,7 @@ app/
   main.py                 app wiring (lifespan: Postgres, Redis, forge client, embedder, limiter)
   config.py               settings from env; stream naming
   worker.py               ingestion worker: fairness, delivery guarantees, bad-document handling
+  mcp_server.py           MCP tools over the REST API (streamable HTTP or stdio)
   api/
     deps.py               API key → tenant, token-bucket dependencies
     routes_documents.py   upload, list, get, delete, search
@@ -319,5 +368,5 @@ docker/Dockerfile, docker-compose.yml, Makefile
 - [x] **Phase 3:** all LLM calls through forge, one forge key per tenant
 - [x] **Phase 4:** token-bucket rate limits and the security layer
 - [x] **Audit and design review:** ponytail cuts, injection false positives, relevance floor, fair ingestion
-- [ ] **Phase 5:** MCP server (`search_documents`, `ask`, `list_documents`)
+- [x] **Phase 5:** MCP server (`search_documents`, `ask`, `list_documents`)
 - [ ] **Phase 6:** evals, failure drills and benchmarks gated in CI
