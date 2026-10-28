@@ -66,6 +66,20 @@ services:
       migrate: { condition: service_completed_successfully }
       redis: { condition: service_healthy }
 
+  # One tenant's documents over MCP (streamable HTTP, :8090/mcp). Off by
+  # default: start it with `make mcp KEY=<that tenant's atlas key>`.
+  mcp:
+    build: { context: ., dockerfile: docker/Dockerfile }
+    command: python -m app.mcp_server
+    profiles: [mcp]
+    ports: ["127.0.0.1:8090:8090"]  # whoever reaches it acts as the tenant: localhost only
+    environment:
+      ATLAS_API_KEY: ${ATLAS_API_KEY:-}
+      ATLAS_API_URL: http://api:8000
+      ATLAS_MCP_HOST: 0.0.0.0  # inside the container; the published port above is what limits access
+    depends_on:
+      api: { condition: service_healthy }
+
   # --- forge: LLM gateway with circuit-breaker failover (primary -> fallback) ---
   forge:
     build: ${FORGE_DIR:-../forge}/services/gateway

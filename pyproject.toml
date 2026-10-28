@@ -19,6 +19,7 @@ dependencies = [
     "pypdf>=5.0",
     # pulls in torch; the Dockerfile installs the CPU-only build first
     "sentence-transformers>=6.0",
+    "mcp>=2.2,<3",  # app/mcp_server.py
 ]
 
 [project.optional-dependencies]

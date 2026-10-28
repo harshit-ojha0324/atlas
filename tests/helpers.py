@@ -6,6 +6,9 @@ import random
 
 EMBEDDING_DIM = 384
 
+# what the mock forge (conftest.forge) returns for every follow-up rewrite
+ZEBRA = "Zebra migration patterns across the Serengeti in the dry season."
+
 
 class FakeEmbedder:
     """Identical text -> identical unit vector, so a query equal to a chunk's

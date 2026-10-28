@@ -1,36 +1,11 @@
 """/ask: every LLM call goes to forge as the asking tenant, with only that tenant's context."""
 
-import json
-
 import httpx
 import pytest
-import respx
-from conftest import FORGE
+from helpers import ZEBRA
 
 ALPHA = "Alpha budget report for the river restoration project."
-ZEBRA = "Zebra migration patterns across the Serengeti in the dry season."
 PENGUIN = "Penguin colonies nest on the Antarctic coast through the winter."
-
-
-@pytest.fixture
-def forge():
-    """Mock forge. Records every chat request; answers condense prompts with ZEBRA."""
-    calls = []
-
-    def reply(request: httpx.Request) -> httpx.Response:
-        body = json.loads(request.content)
-        calls.append({"auth": request.headers["authorization"], **body})
-        prompt = body["messages"][0]["content"]
-        text = ZEBRA if prompt.rstrip().endswith("Standalone Question:") else "grounded answer [p1]"
-        return httpx.Response(
-            200,
-            json={"choices": [{"message": {"role": "assistant", "content": text}}]},
-            headers={"x-forge-backend": "vllm", "x-forge-cache": "miss"},
-        )
-
-    with respx.mock(base_url=FORGE, assert_all_called=False) as router:
-        route = router.post("/v1/chat/completions").mock(side_effect=reply)
-        yield route, calls
 
 
 async def ask(env, tenant: str, question: str, **extra) -> httpx.Response:

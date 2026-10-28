@@ -4,6 +4,7 @@ Redis is fakeredis; the worker runs in-process via Env.drain().
 """
 
 import asyncio
+import json
 import os
 import subprocess
 import sys
@@ -13,7 +14,8 @@ from pathlib import Path
 import fakeredis
 import httpx
 import pytest
-from helpers import FakeEmbedder, make_pdf
+import respx
+from helpers import ZEBRA, FakeEmbedder, make_pdf
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
@@ -123,3 +125,24 @@ async def env(database):
         yield Env(client, sessions, redis, settings, keys, ids)
     await app.state.forge.aclose()
     await engine.dispose()
+
+
+@pytest.fixture
+def forge():
+    """Mock forge. Records every chat request; answers follow-up rewrites with ZEBRA."""
+    calls = []
+
+    def reply(request: httpx.Request) -> httpx.Response:
+        body = json.loads(request.content)
+        calls.append({"auth": request.headers["authorization"], **body})
+        prompt = body["messages"][0]["content"]
+        text = ZEBRA if prompt.rstrip().endswith("Standalone Question:") else "grounded answer [p1]"
+        return httpx.Response(
+            200,
+            json={"choices": [{"message": {"role": "assistant", "content": text}}]},
+            headers={"x-forge-backend": "vllm", "x-forge-cache": "miss"},
+        )
+
+    with respx.mock(base_url=FORGE, assert_all_called=False) as router:
+        route = router.post("/v1/chat/completions").mock(side_effect=reply)
+        yield route, calls
