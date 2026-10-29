@@ -35,7 +35,11 @@ def create_app() -> FastAPI:
         app.state.forge = httpx.AsyncClient(
             base_url=settings.forge_base_url, timeout=settings.forge_timeout_s
         )
-        app.state.embedder = Embedder()
+        # One torch thread per query embedding. By default torch gives every
+        # call all the cores, so concurrent queries fight over them: under load
+        # (make bench, 50 + 10 req/s) /search p95 fell from 82ms to 16-20ms.
+        # The worker keeps the default; it embeds one document's batch at a time.
+        app.state.embedder = Embedder(threads=1)
         yield
         await app.state.forge.aclose()
         await app.state.redis.aclose()

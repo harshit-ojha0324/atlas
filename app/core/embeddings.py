@@ -11,10 +11,14 @@ MODEL = "sentence-transformers/all-MiniLM-L6-v2"
 
 
 class Embedder:
-    def __init__(self):
+    def __init__(self, threads: int | None = None):
         # imported here: sentence-transformers pulls in torch, which tests
         # using a fake embedder never need to load
+        import torch
         from sentence_transformers import SentenceTransformer
+
+        if threads:
+            torch.set_num_threads(threads)
 
         self.model = SentenceTransformer(MODEL, device="cpu")
         dim = self.model.get_embedding_dimension()
