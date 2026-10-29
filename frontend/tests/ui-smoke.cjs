@@ -154,15 +154,33 @@ async function noOverflow(page, label) {
       'reduced motion disables decorative animation',
     );
     await page.getByRole('button', { name: /Find the essentials/ }).click();
+    const questionBox = page.getByRole('textbox', { name: 'Your question' });
+    const starter = 'What does my library say about ';
+    check((await questionBox.inputValue()) === starter, 'prompt card starts the question');
     check(
-      (await page.getByRole('textbox', { name: 'Your question' }).inputValue()) ===
-        'What are the key takeaways from my documents?',
-      'prompt card fills the question',
+      await page.locator('.composer').getByRole('button', { name: 'Ask Atlas', exact: true }).isDisabled(),
+      'a starter without a topic cannot be asked',
     );
+    // the card focuses the field on the next frame, after the value renders
+    check(
+      await page
+        .waitForFunction(
+          () => {
+            const el = document.activeElement;
+            return el?.getAttribute('aria-label') === 'Your question' && el.selectionStart === el.value.length;
+          },
+          null,
+          { timeout: 2000 },
+        )
+        .then(() => true, () => false),
+      'prompt card leaves the cursor after the starter',
+    );
+    await page.keyboard.type('annual leave');
     await page.locator('.composer').getByRole('button', { name: 'Ask Atlas', exact: true }).click();
     await visible(page, 'Reading your documents…');
     await visible(page, 'Answered by Gemini');
     check(asks[0].history.length === 0, 'first question has empty history');
+    check(asks[0].question === 'What does my library say about annual leave', 'the completed question is sent');
     check(
       (await page.getByText('25 days of paid leave', { exact: true }).evaluate((el) => el.tagName)) ===
         'STRONG',

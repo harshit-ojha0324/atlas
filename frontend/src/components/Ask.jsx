@@ -88,6 +88,16 @@ const humanize = (warning) =>
 
 const sentence = (text) => text.charAt(0).toUpperCase() + text.slice(1);
 
+// Suggestion cards start a question and leave the topic to the reader. Retrieval
+// matches a question against passage content, so questions about the documents
+// as a whole ("what are the key takeaways?") score under the relevance floor
+// and are always declined; a named topic scores well above it.
+const STARTERS = [
+  [FileText, 'Find the essentials', 'Name a topic to get its key facts.', 'What does my library say about '],
+  [Layers, 'Connect the dots', 'See how your documents describe one topic.', 'How do my documents describe '],
+  [Compass, 'Go a little deeper', 'Get the conditions and fine print.', 'What are the rules and exceptions for '],
+];
+
 function Turn({ turn }) {
   return (
     <article className="turn">
@@ -177,6 +187,7 @@ function Ask({ readyCount, loading, onOpenLibrary }) {
   const endRef = useRef(null);
   const inputRef = useRef(null);
   const busy = turns.some((t) => t.pending);
+  const unfinished = STARTERS.some(([, , , starter]) => input === starter); // a card's starter, no topic yet
 
   useEffect(() => {
     if (turns.length)
@@ -265,33 +276,18 @@ function Ask({ readyCount, loading, onOpenLibrary }) {
               <span>START WITH A QUESTION</span>
             </div>
             <div className="prompt-grid">
-              {[
-                [
-                  FileText,
-                  'Find the essentials',
-                  'Make sense of the bigger picture.',
-                  'What are the key takeaways from my documents?',
-                ],
-                [
-                  Layers,
-                  'Connect the dots',
-                  'See how ideas come together.',
-                  'What common themes connect my documents?',
-                ],
-                [
-                  Compass,
-                  'Go a little deeper',
-                  'Get clarity on the details that matter.',
-                  'What important details should I pay attention to?',
-                ],
-              ].map(([Icon, title, description, question], i) => (
+              {STARTERS.map(([Icon, title, description, starter], i) => (
                 <button
                   className="prompt-card"
                   key={title}
                   disabled={!readyCount || loading}
                   onClick={() => {
-                    setInput(question);
-                    inputRef.current?.focus();
+                    setInput(starter);
+                    // after the input re-renders: focus it with the cursor at the end
+                    requestAnimationFrame(() => {
+                      inputRef.current?.focus();
+                      inputRef.current?.setSelectionRange(starter.length, starter.length);
+                    });
                   }}
                 >
                   <div className="prompt-card-top">
@@ -357,7 +353,7 @@ function Ask({ readyCount, loading, onOpenLibrary }) {
           <button
             className="btn ask-submit"
             type="submit"
-            disabled={busy || !input.trim() || readyCount === 0}
+            disabled={busy || !input.trim() || unfinished || readyCount === 0}
             aria-label={busy ? 'Answer in progress' : 'Ask Atlas'}
           >
             {busy ? <Loader size={19} className="spin" /> : <ArrowUp size={20} />}
