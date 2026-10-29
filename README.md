@@ -2,7 +2,9 @@
 
 [![ci](https://github.com/harshit-ojha0324/atlas/actions/workflows/ci.yml/badge.svg)](https://github.com/harshit-ojha0324/atlas/actions/workflows/ci.yml)
 
-atlas is a multi-tenant retrieval-augmented generation (RAG) service. Tenants upload PDFs and ask questions about them over a REST API or as MCP tools. Background workers parse, chunk and embed documents into Postgres with pgvector. Answers are generated through [forge](https://github.com/harshit-ojha0324/forge), an LLM gateway that provides per-tenant quotas, response caching and failover between models.
+atlas is a multi-tenant retrieval-augmented generation (RAG) service. Tenants upload PDFs and ask questions about them in a web interface, over a REST API, or as MCP tools. Background workers parse, chunk and embed documents into Postgres with pgvector. Answers are generated through [forge](https://github.com/harshit-ojha0324/forge), an LLM gateway that provides per-tenant quotas, response caching and failover between models.
+
+<img src="docs/images/ui-ask.png" alt="Atlas web interface: two questions about a company handbook, each answered by Gemini with numbered sources and the cited passage expanded" width="860">
 
 - Tenant isolation. Every query, rate limit, model quota and cached answer is scoped to the tenant.
 - Fair ingestion. Each tenant has its own queue, so one tenant's backlog doesn't delay another's documents.
@@ -12,8 +14,8 @@ atlas is a multi-tenant retrieval-augmented generation (RAG) service. Tenants up
 ## Architecture
 
 ```
- Client ── REST ──▶ API (FastAPI) ─────────────────────────────▶ forge ──▶ primary model
-   │                 │  auth · rate limits · security layer         │       (fallback on failure)
+ Browser ─────────▶ API (FastAPI) ─────────────────────────────▶ forge ──▶ primary model
+ REST client         │  web UI · auth · rate limits · security      │       (fallback on failure)
  MCP client          │  retrieval                                  │
    └─▶ MCP server ───┘                                             cache, quotas, fair queueing
        (one tenant)  │
@@ -32,6 +34,7 @@ atlas is a multi-tenant retrieval-augmented generation (RAG) service. Tenants up
 | Queueing, rate limits | Redis 7: Streams and a Lua token bucket |
 | Embeddings | `all-MiniLM-L6-v2` (sentence-transformers, CPU) |
 | Generation | forge (OpenAI-compatible gateway) |
+| Web interface | React 18 and Vite, built into the image and served by the API |
 | Agent interface | MCP (`mcp` SDK, streamable HTTP or stdio) |
 
 ## Quick start
@@ -50,7 +53,7 @@ curl -H "X-API-Key: $KEY" -H 'content-type: application/json' \
      -d '{"question": "How many vacation days do employees get?"}' localhost:8000/ask
 ```
 
-A new tenant can upload immediately; forge picks up its key within 30 seconds. By default forge serves mock models, so answers are placeholder text. To use Gemini, copy `.env.example` to `.env` and add an API key. Gemini is configured as forge's fallback, which serves only when the primary fails, so either stop the mock primary (`docker compose stop mock-vllm`) or set the `FORGE_PRIMARY_*` variables instead.
+Open `http://localhost:8000` and sign in with the key, or use the API directly. A new tenant can upload immediately; forge picks up its key within 30 seconds. By default forge serves mock models, so answers are placeholder text. To use Gemini, copy `.env.example` to `.env` and add an API key. Gemini is configured as forge's fallback, which serves only when the primary fails, so either stop the mock primary (`docker compose stop mock-vllm`) or set the `FORGE_PRIMARY_*` variables instead.
 
 | Service | Port |
 |---|---|
@@ -60,6 +63,20 @@ A new tenant can upload immediately; forge picks up its key within 30 seconds. B
 | Postgres (tests) | 5433 |
 
 All ports are bound to localhost.
+
+## Web interface
+
+The API serves a web interface at `/`, so it shares the API's origin and needs no CORS setup.
+
+- **Sign in** with a workspace's API key. The key is kept for the browser tab only and cleared when it closes.
+- **Library** lists the workspace's documents with their status. New uploads show as processing and switch to ready (or failed, with the reason) on their own.
+- **Ask** answers questions in a reading layout, keeps the conversation for follow-up questions, and lists the passages each answer used, with any security notes and the model that answered.
+
+<img src="docs/images/ui-library.png" alt="Library: two documents ready and a third processing" width="720">
+
+<img src="docs/images/ui-signin.png" alt="Sign-in screen with the Atlas mark, an armillary sphere" width="720">
+
+To work on the interface, run `npm install` and `npm run dev` in `frontend/`; the development server forwards API calls to `localhost:8000`.
 
 ## API
 
@@ -215,6 +232,7 @@ The load test on a GitHub-hosted runner ([CI run 40813987003](https://github.com
 - Fair scheduling is per document; a very large PDF occupies a worker until it finishes.
 - PII and injection detection are pattern-based. Ten-digit numbers such as order IDs are redacted as phone numbers.
 - `/ask` does not stream responses.
+- The web interface has no automated tests; it was checked by hand in a browser.
 - There is no command to delete a tenant. forge keys are stored in plain text, as they are in forge's own configuration.
 - A missing API key returns `422` rather than `401`.
 
@@ -230,6 +248,7 @@ app/
   core/                   chunking, embeddings, retrieval, answering, security, rate limiter
   models/                 database models
   scripts/create_tenant.py
+frontend/                 web interface (React, Vite)
 migrations/               Alembic migrations
 scripts/                  evaluation, drills, benchmark, shared helpers
 bench/                    k6 load test
@@ -241,4 +260,4 @@ deploy/                   forge tenant configuration (example)
 
 ## Acknowledgements
 
-atlas reuses components from earlier projects: the gateway from [forge](https://github.com/harshit-ojha0324/forge); the Redis Streams worker and token-bucket limiter from [shrtr](https://github.com/harshit-ojha0324/shrtr); the chunker, prompts, security patterns and evaluation set from [Gemini-Powered-RAG-System](https://github.com/harshit-ojha0324/Gemini-Powered-RAG-System); and the MCP server structure from [smart-city-navigator](https://github.com/harshit-ojha0324/smart-city-navigator).
+atlas reuses components from earlier projects: the gateway from [forge](https://github.com/harshit-ojha0324/forge); the Redis Streams worker and token-bucket limiter from [shrtr](https://github.com/harshit-ojha0324/shrtr); the chunker, prompts, security patterns, evaluation set, and the starting point for the web interface's upload and chat logic from [Gemini-Powered-RAG-System](https://github.com/harshit-ojha0324/Gemini-Powered-RAG-System); and the MCP server structure from [smart-city-navigator](https://github.com/harshit-ojha0324/smart-city-navigator).
