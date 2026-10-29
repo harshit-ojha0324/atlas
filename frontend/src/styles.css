@@ -1,4 +1,6 @@
 /* Atlas: a celestial archive. All illustration and motion stay on the client. */
+/* Readable text is never set below 11px. Only the lettering drawn inside the
+   observatory and the PDF mark inside file icons are smaller: they're decoration. */
 :root {
   color-scheme: dark;
   --bg: #111615;
@@ -199,7 +201,7 @@ input::placeholder {
 .eyebrow,
 .section-index,
 .nav-label {
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 550;
   letter-spacing: 0.17em;
 }
@@ -265,8 +267,8 @@ h1 em,
   color: var(--gold);
 }
 .brand-caption {
-  font-size: 7px;
-  letter-spacing: 0.2em;
+  font-size: 11px;
+  letter-spacing: 0.04em; /* one line in the sidebar at 11px */
   color: var(--muted);
   margin: 13px 0 30px 4px;
 }
@@ -284,7 +286,7 @@ h1 em,
   display: block;
   font-weight: 400;
   color: var(--subtle);
-  font-size: 9px;
+  font-size: 11px;
   margin-top: 1px;
 }
 .workspace-avatar {
@@ -303,7 +305,7 @@ h1 em,
 .nav-label {
   color: var(--subtle);
   margin: 31px 12px 13px;
-  font-size: 9px;
+  font-size: 11px;
 }
 .tabs {
   display: flex;
@@ -341,7 +343,7 @@ h1 em,
   opacity: 1;
 }
 .nav-count {
-  font-size: 10px;
+  font-size: 11px;
   color: var(--muted);
   border-radius: 3px;
   background: #ffffff07;
@@ -376,7 +378,7 @@ h1 em,
 }
 .sidebar-note > span {
   display: block;
-  font-size: 10px;
+  font-size: 11px;
   color: var(--muted);
   margin: 12px 0 17px;
   max-width: 140px;
@@ -391,7 +393,7 @@ h1 em,
   border-top: 1px solid var(--line);
   background: none;
   color: var(--gold);
-  font-size: 10px;
+  font-size: 11px;
 }
 .sidebar-note button:hover {
   color: var(--gold-bright);
@@ -401,7 +403,7 @@ h1 em,
   gap: 7px;
   align-items: center;
   margin: 24px 2px 16px;
-  font-size: 9px;
+  font-size: 11px;
   color: var(--muted);
 }
 .signout {
@@ -483,7 +485,7 @@ h1 em,
 }
 .section-index {
   color: var(--subtle);
-  font-size: 9px;
+  font-size: 11px;
   white-space: nowrap;
 }
 .workspace-footer {
@@ -494,11 +496,11 @@ h1 em,
   padding: 16px 0 19px;
   border-top: 1px solid var(--line);
   color: var(--subtle);
-  font-size: 9px;
+  font-size: 11px;
 }
 .workspace-footer > span:first-child {
   letter-spacing: 0.16em;
-  font-size: 8px;
+  font-size: 11px;
 }
 .footer-star {
   color: var(--gold);
@@ -556,7 +558,7 @@ h1 em,
 .orbital-caption {
   display: block;
   text-align: center;
-  font-size: 7px;
+  font-size: 11px;
   letter-spacing: 0.22em;
   opacity: 0.7;
   margin-top: -4px;
@@ -608,7 +610,7 @@ h1 em,
   display: flex;
   align-items: center;
   gap: 7px;
-  font-size: 10px;
+  font-size: 11px;
   color: var(--subtle);
   margin-top: 25px;
 }
@@ -630,7 +632,7 @@ h1 em,
   font-weight: 450;
 }
 .discovery-heading > span {
-  font-size: 8px;
+  font-size: 11px;
   letter-spacing: 0.13em;
   color: var(--subtle);
 }
@@ -666,7 +668,7 @@ h1 em,
   color: var(--gold);
 }
 .prompt-card-top > span {
-  font-size: 9px;
+  font-size: 11px;
   color: var(--subtle);
   font-family: monospace;
 }
@@ -742,7 +744,7 @@ h1 em,
   gap: 12px;
   padding: 10px 2px 0;
   color: var(--subtle);
-  font-size: 10px;
+  font-size: 11px;
 }
 .composer-meta > span {
   display: flex;
@@ -750,7 +752,7 @@ h1 em,
   gap: 5px;
 }
 .composer-meta > span:last-child {
-  font-size: 7px;
+  font-size: 11px;
   letter-spacing: 0.1em;
 }
 kbd {
@@ -787,7 +789,7 @@ kbd {
   font-size: 11px;
 }
 .first-document button {
-  font-size: 10px;
+  font-size: 11px;
 }
 .thread {
   flex: 1;
@@ -811,7 +813,7 @@ kbd {
   letter-spacing: -0.03em;
 }
 .thread-heading > span {
-  font-size: 10px;
+  font-size: 11px;
   color: var(--subtle);
 }
 .turn {
@@ -827,7 +829,7 @@ kbd {
   margin-bottom: 21px;
 }
 .question-label {
-  font-size: 8px;
+  font-size: 11px;
   letter-spacing: 0.17em;
   color: var(--subtle);
 }
@@ -841,7 +843,7 @@ kbd {
   display: flex;
   align-items: center;
   gap: 9px;
-  font-size: 9px;
+  font-size: 11px;
   letter-spacing: 0.15em;
   color: var(--gold);
   margin-bottom: 12px;
@@ -939,7 +941,7 @@ kbd {
   gap: 7px;
   align-items: center;
   color: var(--muted);
-  font-size: 10px;
+  font-size: 11px;
   letter-spacing: 0.12em;
   margin-bottom: 9px;
 }
@@ -983,7 +985,7 @@ kbd {
   border-radius: 3px;
   width: 24px;
   height: 26px;
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 400;
   flex-shrink: 0;
 }
@@ -1061,7 +1063,7 @@ kbd {
   align-items: center;
   gap: 6px;
   color: var(--muted);
-  font-size: 10px;
+  font-size: 11px;
   letter-spacing: 0.1em;
 }
 .library-stats strong {
@@ -1154,7 +1156,7 @@ kbd {
   border: 1px solid var(--line);
   border-radius: 4px;
   padding: 0 6px;
-  font-size: 10px;
+  font-size: 11px;
 }
 .library-controls {
   display: flex;
@@ -1375,7 +1377,7 @@ kbd {
   padding-top: 42px;
 }
 .signin-story .eyebrow {
-  font-size: 9px;
+  font-size: 11px;
 }
 .signin h1 {
   font-size: clamp(33px, 3.5vw, 55px);
@@ -1397,7 +1399,7 @@ kbd {
   display: flex;
   justify-content: space-between;
   gap: 12px;
-  font-size: 7px;
+  font-size: 11px;
   letter-spacing: 0.12em;
   color: var(--subtle);
   border-top: 1px solid var(--line);
@@ -1430,7 +1432,7 @@ kbd {
   margin-bottom: 27px;
 }
 .signin-inner .eyebrow {
-  font-size: 8px;
+  font-size: 11px;
   letter-spacing: 0.12em;
 }
 .signin h2 {
@@ -1510,7 +1512,7 @@ kbd {
   margin-top: 5px;
 }
 .signin-bottom {
-  font-size: 9px;
+  font-size: 11px;
   color: var(--subtle);
 }
 
@@ -1616,10 +1618,10 @@ kbd {
     max-width: 310px;
   }
   .hero-proof {
-    font-size: 10px;
+    font-size: 11px;
   }
   .orbital-caption {
-    font-size: 5px;
+    font-size: 11px;
   }
   .prompt-card {
     padding: 16px 13px;
@@ -1663,24 +1665,24 @@ kbd {
     font-size: 33px;
   }
   .brand-caption {
-    font-size: 6px;
+    font-size: 11px;
   }
   .workspace-label {
     padding: 10px 8px;
     gap: 7px;
-    font-size: 10px;
+    font-size: 11px;
   }
   .workspace-label small {
-    font-size: 8px;
+    font-size: 11px;
   }
   .workspace-privacy {
-    font-size: 8px;
+    font-size: 11px;
   }
   .sidebar-note {
     padding: 17px 12px 12px;
   }
   .sidebar-note button {
-    font-size: 9px;
+    font-size: 11px;
   }
   .page {
     padding: 25px 25px 20px;
@@ -1772,7 +1774,7 @@ kbd {
     gap: 5px;
   }
   .signin .eyebrow {
-    font-size: 7px;
+    font-size: 11px;
   }
   .signin h2 {
     font-size: 29px;
@@ -1869,11 +1871,11 @@ kbd {
     gap: 8px;
   }
   .eyebrow {
-    font-size: 8px;
+    font-size: 11px;
     letter-spacing: 0.11em;
   }
   .section-index {
-    font-size: 7px;
+    font-size: 11px;
     letter-spacing: 0.08em;
   }
   .ask {
@@ -1901,7 +1903,7 @@ kbd {
   .hero-proof {
     max-width: none;
     margin-top: 20px;
-    font-size: 10px;
+    font-size: 11px;
     align-items: center;
   }
   .empty > .observatory {
@@ -1957,7 +1959,7 @@ kbd {
     height: 36px;
   }
   .composer-meta {
-    font-size: 10px;
+    font-size: 11px;
   }
   .composer-meta > span:last-child {
     display: none;
@@ -1976,12 +1978,12 @@ kbd {
   }
   .workspace-footer {
     margin: 0 22px;
-    font-size: 7px;
+    font-size: 11px;
     padding: 13px 0;
     gap: 10px;
   }
   .workspace-footer > span:first-child {
-    font-size: 6px;
+    font-size: 11px;
   }
   .footer-star {
     margin-left: 4px;
@@ -2032,7 +2034,7 @@ kbd {
     padding-left: 14px;
   }
   .library-stats span {
-    font-size: 8px;
+    font-size: 11px;
     gap: 4px;
     letter-spacing: 0.06em;
   }
@@ -2141,7 +2143,7 @@ kbd {
   }
   .signin-bottom {
     margin-top: 28px;
-    font-size: 8px;
+    font-size: 11px;
   }
 }
 @media (max-width: 360px) {
