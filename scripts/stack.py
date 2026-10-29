@@ -16,18 +16,21 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "tests"))
 from helpers import make_pdf  # noqa: E402
 
 API = "http://localhost:8000"
+# create_tenant appends to the bind-mounted forge tenants file. On Linux the
+# container's own user (uid 10001) can't write a file the host user owns, so it
+# runs as the host user (Docker Desktop ignores ownership, so it worked there).
+AS_HOST_USER = ("--user", f"{os.getuid()}:{os.getgid()}")
 FORGE_TENANTS_FILE = Path("deploy/forge-tenants.yaml")
 TOPICS = ["pump maintenance", "budget review", "safety audit", "staff rota", "water quality", "grid load"]
 
 
 def compose(*args: str, env: dict | None = None) -> str:
-    return subprocess.run(
-        ["docker", "compose", *args],
-        check=True,
-        capture_output=True,
-        text=True,
-        env={**os.environ, **(env or {})},
-    ).stdout
+    r = subprocess.run(
+        ["docker", "compose", *args], capture_output=True, text=True, env={**os.environ, **(env or {})}
+    )
+    if r.returncode:
+        sys.exit(f"FAIL: docker compose {' '.join(args)} exited {r.returncode}:\n{r.stderr or r.stdout}")
+    return r.stdout
 
 
 def psql(sql: str) -> str:
@@ -82,7 +85,9 @@ class Tenant:
 
 def create_tenant(prefix: str) -> Tenant:
     name = f"{prefix}-{int(time.time() * 1000)}"
-    out = compose("run", "--rm", "--no-deps", "api", "python", "-m", "app.scripts.create_tenant", name)
+    out = compose(
+        "run", "--rm", "--no-deps", *AS_HOST_USER, "api", "python", "-m", "app.scripts.create_tenant", name
+    )
     key = out.split("(shown once): ")[1].strip()
     tenant_id = int(out.split("(id ")[1].split(")")[0])
     client = httpx.Client(base_url=API, headers={"X-API-Key": key}, timeout=120)
