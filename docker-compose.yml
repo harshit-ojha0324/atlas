@@ -7,6 +7,9 @@ x-app-env: &app-env
   DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-atlas}:${POSTGRES_PASSWORD:-atlas}@postgres:5432/${POSTGRES_DB:-atlas}
   REDIS_URL: redis://redis:6379/0
   FORGE_BASE_URL: http://forge:8080
+  # the benchmark (scripts/bench.py) raises the query bucket for its run
+  RATE_QUERY_CAPACITY: ${RATE_QUERY_CAPACITY:-30}
+  RATE_QUERY_REFILL_PER_S: ${RATE_QUERY_REFILL_PER_S:-1.0}
 
 # Only the API, forge and Postgres (for tests) are published, and only on localhost.
 services:
