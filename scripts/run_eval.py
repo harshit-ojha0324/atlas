@@ -20,7 +20,9 @@ Needs the stack up (`make up`). Run: make eval
 
 import argparse
 import sys
+import textwrap
 import time
+from collections import Counter
 
 from eval_set import CORPUS, GOLD
 from stack import create_tenant, delete_tenants, make_pdf, wait_for_forge
@@ -44,7 +46,7 @@ def main() -> None:
         print(f"handbook: {doc['pages']} pages -> {doc['chunk_count']} chunks in {took:.1f}s")
         wait_for_forge(tenant, GOLD[0]["question"])
 
-        rows, hits_at_1, hits_at_k, grounded = [], 0, 0, 0
+        rows, hits_at_1, hits_at_k, grounded, backends = [], 0, 0, 0, Counter()
         answerable = [g for g in GOLD if g["answerable"]]
         for g in GOLD:
             results = tenant.call("POST", "/search", json={"query": g["question"], "k": args.k}).json()
@@ -52,6 +54,7 @@ def main() -> None:
             r.raise_for_status()
             out = r.json()
             declined = out["forge_backend"] is None and not out["sources"]
+            backends[out["forge_backend"] or "none (declined)"] += 1
             top = results[0]["score"] if results else 0.0
             if g["answerable"]:
                 want = {PAGE_OF[i] for i in g["relevant_ids"]}
@@ -72,6 +75,11 @@ def main() -> None:
                 kind = "OOS  declined" if declined else "OOS  ANSWERED"
             grounded += ok
             rows.append(f"  [{'PASS' if ok else 'FAIL'}] {kind:<18} top={top:.2f}  {g['question'][:52]}")
+            if (
+                args.judge_answers and not declined
+            ):  # show the answer, so its quality can be read, not just scored
+                answer = " ".join(out["answer"].split())
+                rows.append(textwrap.indent(textwrap.fill(answer, 80, max_lines=3), " " * 9))
     finally:
         delete_tenants(tenant)
 
@@ -84,6 +92,7 @@ def main() -> None:
     print(f"  context relevance (answerable hit@{args.k}) : {relevance:.0%}")
     print(f"  answerable hit@1                     : {hits_at_1}/{len(answerable)}")
     print(f"  grounded-response rate               : {rate:.0%}")
+    print(f"  answered by                          : {dict(backends)}")
     if relevance < args.threshold or rate < args.threshold:
         sys.exit(f"FAIL: below {args.threshold:.0%}")
     print(f"PASS (threshold {args.threshold:.0%})")

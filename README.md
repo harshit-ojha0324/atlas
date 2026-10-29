@@ -175,6 +175,7 @@ make bench                 # load test
 |---|---|---|
 | Tests | Tenant isolation, worker delivery guarantees, fairness, `/ask` and its security layer, rate limits, MCP tools | 64 passing |
 | `make eval` | 12 questions over a 10-page handbook, end to end: retrieval of the right page, answers grounded in it, and declining out-of-scope questions. Gate: 85%. | 100% relevance (hit@4), 100% grounded, hit@1 8/9 |
+| `make eval` with `--judge-answers`, on Gemini | As above, and each answer must state the gold fact. Needs a real model (see Quick start); not run in CI. | 9/9 answers correct, each citing the right page; 3/3 out-of-scope declined without a model call |
 | `make drill` | Kills the worker mid-document with `SIGKILL`, restarts it, and compares the result with an undisturbed run | Indexed once: same 562 chunks, no duplicates |
 | `make drill-fairness` | A one-page upload from tenant B while tenant A has six large documents queued | B waited 6.8s (44.2s with a single shared queue) |
 | `make bench` | 50 searches and 10 questions per second for 60s. Gate: under 1% errors, p95 under 250 ms and 500 ms. | 0 errors in 3,599 requests; p95 24 ms (`/search`), 31 ms (`/ask`). See [benchmarks/2026-10-28](benchmarks/2026-10-28). |
@@ -183,7 +184,7 @@ Database tests run against a real pgvector instance. CI runs lint and tests, the
 
 ## Limitations
 
-- The local stack uses mock models, so answer quality is not evaluated. `scripts/run_eval.py --judge-answers` checks answer content when a real model is configured.
+- CI runs against mock models, so it gates retrieval and grounding but not answer content. Answer content is checked with `--judge-answers` against a real model, run manually (last result: 9/9 on `gemini-flash-lite-latest`). The evaluation set is 12 questions over one short document.
 - Each document is embedded twice during ingestion (per sentence for chunking, then per chunk).
 - Fair scheduling is per document; a very large PDF occupies a worker until it finishes.
 - PII and injection detection are pattern-based. Ten-digit numbers such as order IDs are redacted as phone numbers.
