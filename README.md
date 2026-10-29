@@ -77,6 +77,14 @@ All endpoints except health checks require an `X-API-Key` header.
 
 Rate-limited responses return `429` with `Retry-After`.
 
+Interactive documentation is served at `localhost:8000/docs`:
+
+<img src="docs/images/api-docs.png" alt="atlas API documentation listing the health, documents and ask endpoints" width="720">
+
+A question containing an email address, answered by Gemini through forge. The address is redacted before the question reaches the model, the answer cites its page, and the response reports which model answered:
+
+<img src="docs/images/ask.png" alt="curl call to POST /ask returning a cited answer, two sources, forge_backend gemini and a PII warning" width="820">
+
 ## MCP server
 
 `app/mcp_server.py` exposes one tenant's documents to MCP clients. It's a client of the REST API, so the same isolation, limits and security checks apply. API errors are returned as tool errors with the API's reason, so the calling model can act on them.
@@ -177,10 +185,28 @@ make bench                 # load test
 | `make eval` | 12 questions over a 10-page handbook, end to end: retrieval of the right page, answers grounded in it, and declining out-of-scope questions. Gate: 85%. | 100% relevance (hit@4), 100% grounded, hit@1 8/9 |
 | `make eval` with `--judge-answers`, on Gemini | As above, and each answer must state the gold fact. Needs a real model (see Quick start); not run in CI. | 9/9 answers correct, each citing the right page; 3/3 out-of-scope declined without a model call |
 | `make drill` | Kills the worker mid-document with `SIGKILL`, restarts it, and compares the result with an undisturbed run | Indexed once: same 562 chunks, no duplicates |
-| `make drill-fairness` | A one-page upload from tenant B while tenant A has six large documents queued | B waited 6.8s (44.2s with a single shared queue) |
+| `make drill-fairness` | A one-page upload from tenant B while tenant A has six large documents queued | B waited 7.1s (44.2s with a single shared queue) |
 | `make bench` | 50 searches and 10 questions per second for 60s. Gate: under 1% errors, p95 under 250 ms and 500 ms. | 0 errors in 3,599 requests; p95 24 ms (`/search`), 31 ms (`/ask`). See [benchmarks/2026-10-28](benchmarks/2026-10-28). |
 
 Database tests run against a real pgvector instance. CI runs lint and tests, then starts the full stack and gates on the evaluation, both drills and the benchmark.
+
+### Sample runs
+
+The evaluation with answers judged on Gemini (`gemini-flash-lite-latest`), run locally on 2026-10-29:
+
+<img src="docs/images/eval-gemini.png" alt="Evaluation output: 12 of 12 questions pass, with each answer citing its handbook page" width="820">
+
+The crash-recovery drill: the worker is killed with `SIGKILL` partway through a 300-page document, restarted, and checked against an undisturbed run of the same PDF:
+
+<img src="docs/images/drill.png" alt="Kill-the-worker drill: all seven exactly-once checks pass" width="820">
+
+The fairness drill: tenant B's one-page upload waits for tenant A's document in progress, not for A's whole backlog:
+
+<img src="docs/images/fairness.png" alt="Noisy-neighbour drill: tenant B waited 7.1 seconds against a 23.1 second limit" width="820">
+
+The load test on a GitHub-hosted runner ([CI run 40813987003](https://github.com/harshit-ojha0324/atlas/actions/runs/40813987003)), 30s at 50 searches and 10 questions per second:
+
+<img src="docs/images/bench.png" alt="k6 benchmark output from CI: all thresholds pass, 0 errors in 1,801 requests" width="820">
 
 ## Limitations
 
@@ -208,6 +234,7 @@ migrations/               Alembic migrations
 scripts/                  evaluation, drills, benchmark, shared helpers
 bench/                    k6 load test
 benchmarks/               recorded benchmark results
+docs/images/              screenshots used in this README
 tests/
 deploy/                   forge tenant configuration (example)
 ```
