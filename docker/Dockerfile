@@ -1,4 +1,13 @@
 # Multi-stage build shared by the API and the worker (compose overrides the command).
+
+# The web UI, served by the API from frontend/dist
+FROM node:20-alpine AS ui
+WORKDIR /ui
+COPY frontend/package.json frontend/package-lock.json ./
+RUN npm ci --no-audit --no-fund
+COPY frontend ./
+RUN npm run build
+
 FROM python:3.12-slim AS builder
 RUN python -m venv /venv
 ENV PATH=/venv/bin:$PATH
@@ -19,6 +28,7 @@ SentenceTransformer('sentence-transformers/all-MiniLM-L6-v2')"
 ENV HF_HUB_OFFLINE=1
 WORKDIR /app
 COPY app ./app
+COPY --from=ui /ui/dist ./frontend/dist
 COPY migrations ./migrations
 COPY alembic.ini ./alembic.ini
 USER atlas

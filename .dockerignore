@@ -1,0 +1,7 @@
+# Keep the build context small and host-specific files out of the image
+.git
+.venv
+frontend/node_modules
+frontend/dist
+benchmarks
+docs

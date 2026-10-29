@@ -13,3 +13,5 @@ benchmarks/latest/
 benchmarks/trial/
 forge-src/
 benchmarks/ci/
+frontend/node_modules/
+frontend/dist/

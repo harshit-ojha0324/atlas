@@ -1,8 +1,10 @@
 from contextlib import asynccontextmanager
+from pathlib import Path
 
 import httpx
 from fastapi import FastAPI
 from fastapi.responses import PlainTextResponse
+from fastapi.staticfiles import StaticFiles
 from prometheus_client import CONTENT_TYPE_LATEST, generate_latest
 from redis.asyncio import BlockingConnectionPool, Redis
 
@@ -55,6 +57,13 @@ def create_app() -> FastAPI:
     app.include_router(routes_health.router)
     app.include_router(routes_documents.router)
     app.include_router(routes_ask.router)
+
+    # The web UI (frontend/, built into the image by the Dockerfile), served from
+    # the API's own origin so the browser needs no CORS. Mounted last, so API
+    # routes always match first.
+    ui = Path(__file__).resolve().parents[1] / "frontend" / "dist"
+    if ui.is_dir():
+        app.mount("/", StaticFiles(directory=ui, html=True), name="ui")
     return app
 
 
