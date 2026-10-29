@@ -50,7 +50,7 @@ curl -H "X-API-Key: $KEY" -H 'content-type: application/json' \
      -d '{"question": "How many vacation days do employees get?"}' localhost:8000/ask
 ```
 
-A new tenant can upload immediately; forge picks up its key within 30 seconds. The local stack runs forge with mock models, so answers are placeholder text. To use a real model, set `FORGE_FALLBACK_BASE_URL`, `FORGE_FALLBACK_API_KEY` and `FORGE_FALLBACK_MODEL` on the `forge` service.
+A new tenant can upload immediately; forge picks up its key within 30 seconds. By default forge serves mock models, so answers are placeholder text. To use Gemini, copy `.env.example` to `.env` and add an API key. Gemini is configured as forge's fallback, which serves only when the primary fails, so either stop the mock primary (`docker compose stop mock-vllm`) or set the `FORGE_PRIMARY_*` variables instead.
 
 | Service | Port |
 |---|---|

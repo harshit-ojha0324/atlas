@@ -89,6 +89,14 @@ services:
     ports: ["127.0.0.1:8081:8080"]  # host 8081: forge's own standalone stack uses 8080
     environment:
       FORGE_REDIS_URL: redis://redis:6379/1
+      # Models: the mocks below unless .env says otherwise (see .env.example).
+      # The fallback only serves when the primary fails.
+      FORGE_PRIMARY_BASE_URL: ${FORGE_PRIMARY_BASE_URL:-http://mock-vllm:8000/v1}
+      FORGE_PRIMARY_API_KEY: ${FORGE_PRIMARY_API_KEY:-not-needed}
+      FORGE_PRIMARY_MODEL: ${FORGE_PRIMARY_MODEL:-qwen2.5-3b-instruct}
+      FORGE_FALLBACK_BASE_URL: ${FORGE_FALLBACK_BASE_URL:-http://mock-gemini:8000/v1}
+      FORGE_FALLBACK_API_KEY: ${FORGE_FALLBACK_API_KEY:-not-needed}
+      FORGE_FALLBACK_MODEL: ${FORGE_FALLBACK_MODEL:-gemini-2.0-flash}
       FORGE_BREAKER_COOLDOWN_S: "10"
       FORGE_CONNECT_TIMEOUT_S: "1"
     volumes:
