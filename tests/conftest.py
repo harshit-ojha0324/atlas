@@ -46,6 +46,8 @@ def database():
     try:
         asyncio.run(create_test_db())
     except OSError as e:
+        if os.environ.get("CI"):  # in CI a missing database is a failure, never a silent skip
+            raise
         pytest.skip(f"needs Postgres at {TEST_DB} (run `make up`): {e}")
     subprocess.run(
         [sys.executable, "-m", "alembic", "upgrade", "head"],

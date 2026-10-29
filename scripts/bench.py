@@ -51,12 +51,14 @@ def main() -> None:
         k6 = subprocess.run(
             [
                 "docker", "run", "--rm",
-                "--add-host=host.docker.internal:host-gateway",  # Linux; Docker Desktop has it built in
+                # on the stack's own network: the API's published port is
+                # 127.0.0.1-only, which a container can't reach on Linux
+                "--network", "atlas_default",
                 "-v", f"{ROOT / 'bench'}:/bench:ro", "-v", f"{out}:/out",
                 K6_IMAGE, "run", "--quiet",
                 "--summary-export", "/out/k6-summary.json",
                 "--summary-trend-stats", "avg,med,p(95),p(99),max",
-                "-e", "BASE_URL=http://host.docker.internal:8000",
+                "-e", "BASE_URL=http://api:8000",
                 "-e", f"API_KEY={tenant.key}",
                 "-e", f"QUESTIONS={json.dumps(questions)}",
                 "-e", f"DURATION={args.duration}",

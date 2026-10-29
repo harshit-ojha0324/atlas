@@ -11,3 +11,5 @@ dist/
 deploy/forge-tenants.yaml
 benchmarks/latest/
 benchmarks/trial/
+forge-src/
+benchmarks/ci/
