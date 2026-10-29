@@ -16,7 +16,7 @@ import sys
 from pathlib import Path
 
 from eval_set import CORPUS, GOLD
-from stack import compose, create_tenant, delete_tenants, make_pdf, wait_for_forge
+from stack import AS_HOST_USER, compose, create_tenant, delete_tenants, make_pdf, wait_for_forge
 
 K6_IMAGE = "grafana/k6:2.3.0"
 ROOT = Path(__file__).resolve().parents[1]
@@ -54,6 +54,9 @@ def main() -> None:
                 # on the stack's own network: the API's published port is
                 # 127.0.0.1-only, which a container can't reach on Linux
                 "--network", "atlas_default",
+                # k6's image runs as its own user, which can't write a folder the
+                # host user owns on Linux; write the summary as the host user
+                *AS_HOST_USER,
                 "-v", f"{ROOT / 'bench'}:/bench:ro", "-v", f"{out}:/out",
                 K6_IMAGE, "run", "--quiet",
                 "--summary-export", "/out/k6-summary.json",
