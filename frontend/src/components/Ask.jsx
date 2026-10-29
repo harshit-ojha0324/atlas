@@ -1,6 +1,19 @@
 import { useState, useRef, useEffect } from 'react';
-import { Loader } from 'lucide-react';
+import {
+  ArrowRight,
+  ArrowUp,
+  ArrowUpRight,
+  BookOpen,
+  Compass,
+  FileText,
+  Layers,
+  Loader,
+  Plus,
+  ShieldCheck,
+  Sparkles,
+} from 'lucide-react';
 import Sphere from './Sphere';
+import Observatory from './Observatory';
 import api from '../services/api';
 
 // The API accepts up to 20 history messages (10 question-answer turns) of up to
@@ -14,11 +27,16 @@ const EXCERPT_CHARS = 200;
 // "* " or "- " bullets, **bold**, *italic*) as React elements, never as HTML,
 // so an answer can't inject markup. Code ticks are dropped: answers are prose.
 function inline(text) {
-  return text.replace(/`/g, '').split(/(\*\*[^*]+\*\*|\*[^*\n]+\*)/).map((part, i) => {
-    if (part.startsWith('**') && part.endsWith('**') && part.length > 4) return <strong key={i}>{part.slice(2, -2)}</strong>;
-    if (part.startsWith('*') && part.endsWith('*') && part.length > 2) return <em key={i}>{part.slice(1, -1)}</em>;
-    return part;
-  });
+  return text
+    .replace(/`/g, '')
+    .split(/(\*\*[^*]+\*\*|\*[^*\n]+\*)/)
+    .map((part, i) => {
+      if (part.startsWith('**') && part.endsWith('**') && part.length > 4)
+        return <strong key={i}>{part.slice(2, -2)}</strong>;
+      if (part.startsWith('*') && part.endsWith('*') && part.length > 2)
+        return <em key={i}>{part.slice(1, -1)}</em>;
+      return part;
+    });
 }
 
 function Prose({ text }) {
@@ -37,9 +55,15 @@ function Prose({ text }) {
     }
   }
   return blocks.map((b, i) =>
-    b.type === 'ul' ? <ul key={i}>{b.lines.map((l, j) => <li key={j}>{inline(l)}</li>)}</ul>
-    : b.type === 'p' ? <p key={i}>{inline(b.lines.join(' '))}</p>
-    : null
+    b.type === 'ul' ? (
+      <ul key={i}>
+        {b.lines.map((l, j) => (
+          <li key={j}>{inline(l)}</li>
+        ))}
+      </ul>
+    ) : b.type === 'p' ? (
+      <p key={i}>{inline(b.lines.join(' '))}</p>
+    ) : null,
   );
 }
 
@@ -67,29 +91,66 @@ const sentence = (text) => text.charAt(0).toUpperCase() + text.slice(1);
 function Turn({ turn }) {
   return (
     <article className="turn">
-      <h3>{turn.question}</h3>
+      <div className="turn-question">
+        <span className="question-label">YOU ASKED</span>
+        <h3>{turn.question}</h3>
+      </div>
+      <div className="response-heading">
+        <Sphere />
+        <span>ATLAS</span>
+        <span className="response-line" />
+      </div>
       {turn.pending ? (
-        <p className="thinking"><Loader size={15} className="spin" />Reading your documents…</p>
+        <div className="answer-loading" role="status">
+          <p className="thinking">
+            <Loader size={15} className="spin" />
+            Reading your documents…
+          </p>
+          <div className="skeleton" />
+          <div className="skeleton" />
+          <div className="skeleton" />
+        </div>
       ) : (
         <>
-          {turn.error
-            ? <p className="answer error">{turn.answer}</p>
-            : <div className="answer"><Prose text={turn.answer} /></div>}
+          {turn.error ? (
+            <p className="answer error" role="alert">
+              {turn.answer}
+            </p>
+          ) : (
+            <div className="answer">
+              <Prose text={turn.answer} />
+            </div>
+          )}
 
           {turn.warnings?.length > 0 && (
             <ul className="warnings" aria-label="Security notes">
-              {turn.warnings.map((w) => <li key={w}>{humanize(w)}</li>)}
+              {turn.warnings.map((w) => (
+                <li key={w}>{humanize(w)}</li>
+              ))}
             </ul>
           )}
 
           {turn.sources?.length > 0 && (
             <div className="sources">
+              <p className="sources-heading">
+                <BookOpen size={14} /> SOURCES <span>{turn.sources.length}</span>
+              </p>
               <ol>
                 {turn.sources.map((s, i) => (
                   <li key={i}>
                     <details className="source">
-                      <summary><b>[{i + 1}]</b>{s.document}, page {s.page}</summary>
-                      <p>{s.excerpt}{s.excerpt.length >= EXCERPT_CHARS && '…'}</p>
+                      <summary>
+                        <b>{String(i + 1).padStart(2, '0')}</b>
+                        <span>
+                          {s.document}
+                          <small>Page {s.page}</small>
+                        </span>
+                        <Plus size={15} className="source-expand" />
+                      </summary>
+                      <p>
+                        {s.excerpt}
+                        {s.excerpt.length >= EXCERPT_CHARS && '…'}
+                      </p>
                     </details>
                   </li>
                 ))}
@@ -99,7 +160,9 @@ function Turn({ turn }) {
 
           {turn.backend && (
             <p className="answered-by">
-              {turn.backend === 'cache' ? 'Answered from cache' : `Answered by ${BACKENDS[turn.backend] ?? turn.backend}`}
+              {turn.backend === 'cache'
+                ? 'Answered from cache'
+                : `Answered by ${BACKENDS[turn.backend] ?? turn.backend}`}
             </p>
           )}
         </>
@@ -108,13 +171,20 @@ function Turn({ turn }) {
   );
 }
 
-function Ask({ readyCount }) {
+function Ask({ readyCount, loading, onOpenLibrary }) {
   const [turns, setTurns] = useState([]);
   const [input, setInput] = useState('');
   const endRef = useRef(null);
+  const inputRef = useRef(null);
   const busy = turns.some((t) => t.pending);
 
-  useEffect(() => { endRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [turns]);
+  useEffect(() => {
+    if (turns.length)
+      endRef.current?.scrollIntoView({
+        behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'instant' : 'smooth',
+        block: 'end',
+      });
+  }, [turns]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -149,7 +219,9 @@ function Ask({ readyCount }) {
     } catch (error) {
       done = {
         question,
-        answer: error.detail ? sentence(error.detail) : 'The question couldn’t be answered. Try again in a moment.',
+        answer: error.detail
+          ? sentence(error.detail)
+          : 'The question couldn’t be answered. Try again in a moment.',
         error: true,
       };
     }
@@ -158,35 +230,148 @@ function Ask({ readyCount }) {
 
   return (
     <div className="ask">
+      <div className="section-topline">
+        <p className="eyebrow">
+          <span /> YOUR KNOWLEDGE, CONNECTED
+        </p>
+        <span className="section-index">01 / DISCOVER</span>
+      </div>
       {turns.length === 0 ? (
-        <section className="empty">
-          <div>
-            <Sphere className="sphere" />
-            <h2>Ask about your documents</h2>
-            <p>Answers come only from the PDFs in your library, and each one names the pages it used.</p>
-          </div>
-        </section>
+        <>
+          <section className="empty">
+            <div className="hero-copy">
+              <div className="hero-kicker">
+                <span className="tiny-star">✦</span> A little curiosity goes a long way.
+              </div>
+              <h1>
+                A world of knowledge.
+                <br />
+                <em>Within reach.</em>
+              </h1>
+              <p>
+                Turn the documents you carry into the answers you need. Ask freely. Explore deeply. Every
+                insight has a source.
+              </p>
+              <div className="hero-proof">
+                <ShieldCheck size={15} />
+                <span>Your documents. Your workspace. Your answers.</span>
+              </div>
+            </div>
+            <Observatory />
+          </section>
+          <section className="discovery" aria-labelledby="discovery-title">
+            <div className="discovery-heading">
+              <h2 id="discovery-title">Where will your curiosity take you?</h2>
+              <span>START WITH A QUESTION</span>
+            </div>
+            <div className="prompt-grid">
+              {[
+                [
+                  FileText,
+                  'Find the essentials',
+                  'Make sense of the bigger picture.',
+                  'What are the key takeaways from my documents?',
+                ],
+                [
+                  Layers,
+                  'Connect the dots',
+                  'See how ideas come together.',
+                  'What common themes connect my documents?',
+                ],
+                [
+                  Compass,
+                  'Go a little deeper',
+                  'Get clarity on the details that matter.',
+                  'What important details should I pay attention to?',
+                ],
+              ].map(([Icon, title, description, question], i) => (
+                <button
+                  className="prompt-card"
+                  key={title}
+                  disabled={!readyCount || loading}
+                  onClick={() => {
+                    setInput(question);
+                    inputRef.current?.focus();
+                  }}
+                >
+                  <div className="prompt-card-top">
+                    <Icon size={19} />
+                    <span>0{i + 1}</span>
+                  </div>
+                  <h3>
+                    {title}
+                    <ArrowUpRight size={16} />
+                  </h3>
+                  <p>{description}</p>
+                </button>
+              ))}
+            </div>
+          </section>
+        </>
       ) : (
-        <div className="thread">
-          {turns.map((t, i) => <Turn key={i} turn={t} />)}
+        <div className="thread" aria-busy={busy}>
+          <div className="thread-heading">
+            <h1>Follow your curiosity.</h1>
+            <span>
+              {turns.length} question{turns.length !== 1 ? 's' : ''}
+            </span>
+          </div>
+          {turns.map((t, i) => (
+            <Turn key={i} turn={t} />
+          ))}
           <div ref={endRef} />
         </div>
       )}
 
       <div className="composer">
+        {!readyCount && !loading && (
+          <div className="first-document">
+            <BookOpen size={18} />
+            <div>
+              <strong>A great answer starts with a source.</strong>
+              <span>Add your first PDF to begin exploring.</span>
+            </div>
+            <button className="text-button" onClick={onOpenLibrary}>
+              Open library <ArrowRight size={16} />
+            </button>
+          </div>
+        )}
         <form onSubmit={handleSubmit}>
+          <Sparkles size={20} className="composer-icon" />
           <input
+            ref={inputRef}
             className="field"
             aria-label="Your question"
             maxLength={2000}
             value={input}
             onChange={(e) => setInput(e.target.value)}
-            placeholder={readyCount ? 'How many vacation days do employees get?' : 'Add a PDF to your library first'}
-            disabled={readyCount === 0}
+            placeholder={
+              loading
+                ? 'Connecting to your library…'
+                : readyCount
+                  ? 'Ask your documents…'
+                  : 'Add a PDF to your library first'
+            }
+            disabled={readyCount === 0 || loading}
           />
-          <button className="btn" type="submit" disabled={busy || !input.trim() || readyCount === 0}>Ask</button>
+          <button
+            className="btn ask-submit"
+            type="submit"
+            disabled={busy || !input.trim() || readyCount === 0}
+            aria-label={busy ? 'Answer in progress' : 'Ask Atlas'}
+          >
+            {busy ? <Loader size={19} className="spin" /> : <ArrowUp size={20} />}
+          </button>
         </form>
-        {readyCount === 0 && <p className="hint">Nothing to search yet. Add a PDF in the Library.</p>}
+        <div className="composer-meta">
+          <span>
+            <ShieldCheck size={12} />
+            Grounded in your library. Always check the sources.
+          </span>
+          <span>
+            ENTER TO ASK <kbd>↵</kbd>
+          </span>
+        </div>
       </div>
     </div>
   );
