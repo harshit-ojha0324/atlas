@@ -16,11 +16,6 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "tests"))
 from helpers import make_pdf  # noqa: E402
 
 API = "http://localhost:8000"
-# create_tenant appends to the bind-mounted forge tenants file. On Linux the
-# container's own user (uid 10001) can't write a file the host user owns, so it
-# runs as the host user (Docker Desktop ignores ownership, so it worked there).
-AS_HOST_USER = ("--user", f"{os.getuid()}:{os.getgid()}")
-FORGE_TENANTS_FILE = Path("deploy/forge-tenants.yaml")
 TOPICS = ["pump maintenance", "budget review", "safety audit", "staff rota", "water quality", "grid load"]
 
 
@@ -85,43 +80,15 @@ class Tenant:
 
 def create_tenant(prefix: str) -> Tenant:
     name = f"{prefix}-{int(time.time() * 1000)}"
-    out = compose(
-        "run", "--rm", "--no-deps", *AS_HOST_USER, "api", "python", "-m", "app.scripts.create_tenant", name
-    )
+    out = compose("run", "--rm", "--no-deps", "api", "python", "-m", "app.scripts.create_tenant", name)
     key = out.split("(shown once): ")[1].strip()
     tenant_id = int(out.split("(id ")[1].split(")")[0])
     client = httpx.Client(base_url=API, headers={"X-API-Key": key}, timeout=120)
     return Tenant(name, tenant_id, key, client)
 
 
-def wait_for_forge(tenant: Tenant, question: str) -> None:
-    """forge re-reads its tenants file every 30s; until then /ask is 503 for a new tenant.
-    `question` must match the tenant's documents, or /ask never reaches forge."""
-    wait_for(
-        lambda: tenant.call("POST", "/ask", json={"question": question}).status_code != 503,
-        60,
-        "forge to accept the tenant",
-        every_s=2,
-    )
-
-
 def delete_tenants(*tenants: Tenant) -> None:
-    """Delete the tenants and their forge keys. The forge file is rewritten in
-    place, keeping its inode, so forge's bind mount keeps seeing it."""
     psql("DELETE FROM tenants WHERE name IN (" + ", ".join(f"'{t.name}'" for t in tenants) + ")")
-    drop = {f"  - name: atlas-{t.name}" for t in tenants}
-    lines = FORGE_TENANTS_FILE.read_text().splitlines(keepends=True)
-    kept, skip = [], 0
-    for line in lines:
-        if line.rstrip("\n") in drop:
-            skip = 3  # the entry's name, api_key and daily_token_quota lines
-        if skip:
-            skip -= 1
-            continue
-        kept.append(line)
-    with FORGE_TENANTS_FILE.open("r+") as f:
-        f.write("".join(kept))
-        f.truncate()
 
 
 def big_pdf(pages: int = 300) -> bytes:

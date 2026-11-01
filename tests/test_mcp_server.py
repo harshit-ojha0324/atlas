@@ -47,7 +47,7 @@ async def test_ask_answers_through_the_api(env, tools, forge):
     await env.drain()
     out = await tools("ask", question="What is the budget report about?")
     assert out["answer"] == "grounded answer [p1]" and out["sources"][0]["document"] == "alpha.pdf"
-    assert calls[0]["auth"] == "Bearer forge-a"  # through /ask, so as tenant A on forge
+    assert calls[0]["subtenant"] == str(env.ids["a"])  # through /ask, so as tenant A on forge
 
 
 async def test_api_refusals_reach_the_model_as_readable_tool_errors(env, tools):

@@ -1,10 +1,11 @@
 """Prompts and the forge call behind /ask.
 
-Every LLM call goes through forge with the asking tenant's own forge key, so
-forge's quotas, fair queueing and response cache all apply per atlas tenant.
-temperature=0 makes answers reproducible and lets forge cache them. The cache
-key covers the whole prompt, retrieved context included, so re-indexing a
-document changes the key and a stale answer is never replayed.
+Every LLM call goes through forge on atlas's one key, naming the asking tenant
+in X-Forge-Subtenant, so forge's quotas, fair queueing and response cache all
+apply per atlas tenant with nothing to provision there. temperature=0 makes
+answers reproducible and lets forge cache them. The cache key covers the whole
+prompt, retrieved context included, so re-indexing a document changes the key
+and a stale answer is never replayed.
 
 Prompts are the RAG app's (backend/agents/prompt_templates.py): SYSTEM rules
 above delimited context and question, both labelled untrusted data.
@@ -67,19 +68,19 @@ def format_history(history: list[dict]) -> str:
     return "\n".join(f"{'Human' if m['role'] == 'user' else 'Assistant'}: {m['content']}" for m in history)
 
 
-async def complete(client: httpx.AsyncClient, forge_key: str, model: str, prompt: str) -> Reply:
+async def complete(
+    client: httpx.AsyncClient, forge_key: str, tenant_id: int, model: str, prompt: str
+) -> Reply:
     try:
         r = await client.post(
             "/v1/chat/completions",
-            headers={"Authorization": f"Bearer {forge_key}"},
+            headers={"Authorization": f"Bearer {forge_key}", "X-Forge-Subtenant": str(tenant_id)},
             json={"model": model, "messages": [{"role": "user", "content": prompt}], "temperature": 0},
         )
     except httpx.HTTPError:
         raise ForgeFailure(502, "the answer service is unreachable")
     if r.status_code == 429:  # quota exhausted or this tenant's queue is full: forge says when to retry
         raise ForgeFailure(429, _forge_message(r), r.headers.get("retry-after"))
-    if r.status_code == 401:
-        raise ForgeFailure(503, "this tenant isn't on forge yet; a new tenant takes up to 30s")
     if r.status_code == 503:
         raise ForgeFailure(503, _forge_message(r), r.headers.get("retry-after"))
     if r.status_code != 200:

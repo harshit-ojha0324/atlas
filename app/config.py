@@ -13,6 +13,9 @@ class Settings(BaseSettings):
     redis_url: str = "redis://localhost:6379/0"
     # forge: the LLM gateway every answer goes through (OpenAI-compatible)
     forge_base_url: str = "http://localhost:8080"
+    # atlas's one key on forge, marked delegate there: every call names the
+    # workspace, and forge gives each its own quota, cache and queue
+    forge_api_key: str = "forge-atlas-localdev-key"
     forge_model: str = "forge-default"  # forge's public model alias
     # above forge's own 60s upstream timeout + 10s queue wait, so forge's
     # answer (or its error) always arrives before atlas gives up

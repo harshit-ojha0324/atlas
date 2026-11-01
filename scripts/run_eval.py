@@ -25,7 +25,7 @@ import time
 from collections import Counter
 
 from eval_set import CORPUS, GOLD
-from stack import create_tenant, delete_tenants, make_pdf, wait_for_forge
+from stack import create_tenant, delete_tenants, make_pdf
 
 PAGE_OF = {passage["id"]: page for page, passage in enumerate(CORPUS, 1)}
 
@@ -44,7 +44,6 @@ def main() -> None:
         doc = tenant.wait_ready(tenant.upload("handbook.pdf", make_pdf([p["text"] for p in CORPUS]))["id"])
         took = time.monotonic() - t0
         print(f"handbook: {doc['pages']} pages -> {doc['chunk_count']} chunks in {took:.1f}s")
-        wait_for_forge(tenant, GOLD[0]["question"])
 
         rows, hits_at_1, hits_at_k, grounded, backends = [], 0, 0, 0, Counter()
         answerable = [g for g in GOLD if g["answerable"]]

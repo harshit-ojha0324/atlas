@@ -8,7 +8,6 @@ __pycache__/
 build/
 dist/
 .DS_Store
-deploy/forge-tenants.yaml
 benchmarks/latest/
 benchmarks/trial/
 forge-src/

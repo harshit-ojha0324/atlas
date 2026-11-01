@@ -26,7 +26,9 @@ async def test_answers_as_the_tenant_from_only_its_documents(env, forge):
     assert (out["forge_backend"], out["forge_cache"]) == ("vllm", "miss")
 
     (call,) = calls
-    assert call["auth"] == "Bearer forge-a"  # A's own forge key: A's quota, A's cache
+    # atlas's one key, naming A: A's quota, A's cache, A's queue
+    assert call["auth"] == "Bearer forge-atlas-localdev-key"
+    assert call["subtenant"] == str(env.ids["a"])
     assert call["temperature"] == 0 and call["model"] == "forge-default"
     prompt = call["messages"][0]["content"]
     assert "[alpha.pdf, page 1]\n" + ALPHA in prompt
@@ -66,7 +68,7 @@ async def test_no_documents_means_no_llm_call(env, forge):
             429,
             "7",
         ),
-        (httpx.Response(401, json={"error": {"message": "invalid key"}}), 503, None),
+        (httpx.Response(401, json={"error": {"message": "invalid key"}}), 502, None),
         (httpx.Response(502, json={"error": {"message": "all backends failed"}}), 502, None),
         (httpx.ConnectError("refused"), 502, None),
     ],
@@ -81,14 +83,15 @@ async def test_forge_failures_map_to_honest_statuses(env, forge, forge_response,
     assert r.headers.get("retry-after") == retry_after
 
 
-async def test_tenant_without_a_forge_key_is_refused(env, forge):
-    from sqlalchemy import update
-
-    from app.models import Tenant
-
-    async with env.sessions.begin() as session:
-        await session.execute(update(Tenant).values(forge_api_key=None))
-    assert (await ask(env, "a", "budget?")).status_code == 503
+async def test_each_tenant_is_named_separately_to_forge(env, forge):
+    _, calls = forge
+    await env.upload("a", "alpha.pdf", [ALPHA])
+    await env.upload("b", "zebra.pdf", [ZEBRA])
+    await env.drain()
+    await ask(env, "a", "budget?")
+    await ask(env, "b", "zebras?")
+    assert [c["subtenant"] for c in calls] == [str(env.ids["a"]), str(env.ids["b"])]
+    assert env.ids["a"] != env.ids["b"]
 
 
 # --- the security layer around /ask ---

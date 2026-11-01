@@ -14,7 +14,6 @@ from typing import Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, Field
-from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from starlette.concurrency import run_in_threadpool
 
@@ -30,7 +29,6 @@ from app.core.answer import (
 )
 from app.core.retrieval import retrieve
 from app.core.security import filter_output, is_injection, redact_pii
-from app.models import Tenant
 from app.observability.metrics import SECURITY_EVENTS
 
 log = logging.getLogger("atlas.ask")
@@ -101,14 +99,9 @@ async def ask(
             continue
         history.append({"role": m.role, "content": content})
 
-    forge_key = await session.scalar(select(Tenant.forge_api_key).where(Tenant.id == tenant_id))
-    if not forge_key:
-        raise HTTPException(
-            status_code=503, detail="this tenant has no forge key; recreate it with make tenant"
-        )
-
     async def llm(prompt: str):
-        return await complete(state.forge, forge_key, state.settings.forge_model, prompt)
+        settings = state.settings
+        return await complete(state.forge, settings.forge_api_key, tenant_id, settings.forge_model, prompt)
 
     try:
         if history:

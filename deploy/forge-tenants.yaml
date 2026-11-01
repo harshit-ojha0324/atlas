@@ -1,0 +1,8 @@
+# forge's tenants for local development only; never commit real keys. In a real
+# deployment this entry goes in forge's Secret, with the key also set as atlas's
+# FORGE_API_KEY. The quota and weight apply to each atlas tenant separately.
+tenants:
+  - name: atlas
+    api_key: forge-atlas-localdev-key
+    daily_token_quota: 200000
+    delegate: true

@@ -105,7 +105,7 @@ async def env(database):
     keys, ids = {}, {}
     async with sessions() as session:
         for name in ("a", "b"):
-            tenant = Tenant(name=name, forge_api_key=f"forge-{name}")
+            tenant = Tenant(name=name)
             session.add(tenant)
             await session.flush()
             keys[name], ids[name] = f"key-{name}", tenant.id
@@ -136,7 +136,13 @@ def forge():
 
     def reply(request: httpx.Request) -> httpx.Response:
         body = json.loads(request.content)
-        calls.append({"auth": request.headers["authorization"], **body})
+        calls.append(
+            {
+                "auth": request.headers["authorization"],
+                "subtenant": request.headers["x-forge-subtenant"],
+                **body,
+            }
+        )
         prompt = body["messages"][0]["content"]
         text = ZEBRA if prompt.rstrip().endswith("Standalone Question:") else "grounded answer [p1]"
         return httpx.Response(
