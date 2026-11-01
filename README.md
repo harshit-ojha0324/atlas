@@ -53,7 +53,7 @@ curl -H "X-API-Key: $KEY" -H 'content-type: application/json' \
      -d '{"question": "How many vacation days do employees get?"}' localhost:8000/ask
 ```
 
-Open `http://localhost:8000` and sign in with the key, or use the API directly. A new tenant can upload immediately; forge picks up its key within 30 seconds. By default forge serves mock models, so answers are placeholder text. To use Gemini, copy `.env.example` to `.env` and add an API key. Gemini is configured as forge's fallback, which serves only when the primary fails, so either stop the mock primary (`docker compose stop mock-vllm`) or set the `FORGE_PRIMARY_*` variables instead.
+Open `http://localhost:8000` and sign in with the key, or use the API directly. A new tenant can upload and ask immediately. By default forge serves mock models, so answers are placeholder text. To use Gemini, copy `.env.example` to `.env` and add an API key. Gemini is configured as forge's fallback, which serves only when the primary fails, so either stop the mock primary (`docker compose stop mock-vllm`) or set the `FORGE_PRIMARY_*` variables instead.
 
 | Service | Port |
 |---|---|
@@ -149,7 +149,7 @@ Documents are split into semantic chunks: sentences are embedded, and a new chun
 
 ### Answering
 
-`/ask` calls forge with the tenant's own forge key at temperature 0. forge therefore applies quotas, fair queueing and caching per tenant. The cache key covers the full prompt, including retrieved passages, so re-indexing a document invalidates cached answers. Follow-up questions are first rewritten into standalone questions.
+`/ask` calls forge at temperature 0 with atlas's one forge key, marked `delegate: true` in forge's configuration, and names the tenant in `X-Forge-Subtenant`. forge therefore applies quotas, fair queueing and caching per tenant, with nothing to provision when a tenant is created or deleted. forge trusts atlas to name tenants correctly, so that key must stay on the server. The cache key covers the full prompt, including retrieved passages, so re-indexing a document invalidates cached answers. Follow-up questions are first rewritten into standalone questions.
 
 If the best passage scores below 0.25 cosine similarity (`ASK_MIN_SCORE`), atlas answers that the documents don't cover the question without calling the model. The threshold sits between the scores of answerable (0.42–0.72) and unanswerable (0.04–0.16) questions in the evaluation set.
 
@@ -181,6 +181,7 @@ Settings are read from the environment (see `app/config.py`). The most relevant:
 | `DATABASE_URL` | `postgresql+asyncpg://atlas:atlas@localhost:5432/atlas` | Postgres connection |
 | `REDIS_URL` | `redis://localhost:6379/0` | Redis connection |
 | `FORGE_BASE_URL` | `http://localhost:8080` | forge gateway |
+| `FORGE_API_KEY` | `forge-atlas-localdev-key` | atlas's key on forge; must match a `delegate: true` entry in forge's tenants file |
 | `ASK_MIN_SCORE` | `0.25` | Minimum passage score for `/ask` to call the model |
 | `RATE_UPLOAD_CAPACITY`, `RATE_UPLOAD_REFILL_PER_S` | `10`, `0.2` | Upload bucket |
 | `RATE_QUERY_CAPACITY`, `RATE_QUERY_REFILL_PER_S` | `30`, `1.0` | Query bucket |
@@ -235,7 +236,8 @@ The load test on a GitHub-hosted runner ([CI run 40813987003](https://github.com
 - PII and injection detection are pattern-based. Ten-digit numbers such as order IDs are redacted as phone numbers.
 - `/ask` does not stream responses.
 - The web interface's smoke test (`frontend/tests/ui-smoke.cjs`, 56 checks against API fixtures) runs locally with Playwright and is not part of CI.
-- There is no command to delete a tenant. forge keys are stored in plain text, as they are in forge's own configuration.
+- There is no command to delete a tenant.
+- Every tenant gets the same forge quota and weight, set on atlas's entry in forge's tenants file.
 - A missing API key returns `422` rather than `401`.
 
 ## Repository layout
@@ -257,7 +259,7 @@ bench/                    k6 load test
 benchmarks/               recorded benchmark results
 docs/images/              screenshots used in this README
 tests/
-deploy/                   forge tenant configuration (example)
+deploy/                   forge tenant configuration (local development)
 ```
 
 ## Acknowledgements
