@@ -61,6 +61,7 @@ async function noOverflow(page, label) {
     let askError = false;
     let deleteError = false;
     let uploadError = false;
+    let nextAnswer = null;
     const asks = [];
     let uploads = 0;
     let deletes = 0;
@@ -89,7 +90,7 @@ async function noOverflow(page, label) {
         asks.push(body);
         await new Promise((resolve) => setTimeout(resolve, 250));
         if (askError) return reply({ detail: 'Query rate limit exceeded.' }, 429, { 'Retry-After': '3' });
-        return reply(answer);
+        return reply(nextAnswer ?? answer);
       }
       if (request.method() === 'POST' && url.pathname === '/documents') {
         uploads++;
@@ -230,6 +231,20 @@ async function noOverflow(page, label) {
     check(
       asks[3].history.length === 4 && !asks[3].history.some((item) => item.content === 'One more question'),
       'failed turns are excluded from follow-up history',
+    );
+    nextAnswer = { ...answer, answer: Array(14).fill('A long paragraph of the answer, repeated so it runs well past one screen of reading.').join('\n\n') };
+    await page.getByRole('textbox', { name: 'Your question' }).fill('Give me the long version.');
+    await page.getByRole('textbox', { name: 'Your question' }).press('Enter');
+    await page.locator('.answered-by').nth(3).waitFor();
+    nextAnswer = null;
+    check(
+      await page
+        .waitForFunction(() => {
+          const top = [...document.querySelectorAll('.turn')].pop().getBoundingClientRect().top;
+          return top >= 0 && top < 100;
+        }, null, { timeout: 2000 })
+        .then(() => true, () => false),
+      'a long answer opens at its question, not its end',
     );
 
     await page

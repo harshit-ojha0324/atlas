@@ -184,17 +184,17 @@ function Turn({ turn }) {
 function Ask({ readyCount, loading, onOpenLibrary }) {
   const [turns, setTurns] = useState([]);
   const [input, setInput] = useState('');
-  const endRef = useRef(null);
+  const threadRef = useRef(null);
   const inputRef = useRef(null);
   const busy = turns.some((t) => t.pending);
   const unfinished = STARTERS.some(([, , , starter]) => input === starter); // a card's starter, no topic yet
 
+  // Bring the newest question to the top, so a long answer is read from its start.
   useEffect(() => {
-    if (turns.length)
-      endRef.current?.scrollIntoView({
-        behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'instant' : 'smooth',
-        block: 'end',
-      });
+    threadRef.current?.lastElementChild?.scrollIntoView({
+      behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'instant' : 'smooth',
+      block: 'start',
+    });
   }, [turns]);
 
   const handleSubmit = async (e) => {
@@ -305,7 +305,7 @@ function Ask({ readyCount, loading, onOpenLibrary }) {
           </section>
         </>
       ) : (
-        <div className="thread" aria-busy={busy}>
+        <div className="thread" aria-busy={busy} ref={threadRef}>
           <div className="thread-heading">
             <h1>Follow your curiosity.</h1>
             <span>
@@ -315,7 +315,6 @@ function Ask({ readyCount, loading, onOpenLibrary }) {
           {turns.map((t, i) => (
             <Turn key={i} turn={t} />
           ))}
-          <div ref={endRef} />
         </div>
       )}
 

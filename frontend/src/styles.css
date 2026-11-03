@@ -818,6 +818,7 @@ kbd {
 }
 .turn {
   margin-bottom: 35px;
+  scroll-margin-top: 24px;
   overflow-wrap: anywhere;
   animation: reveal 0.45s ease both;
 }
