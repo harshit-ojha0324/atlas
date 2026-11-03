@@ -31,9 +31,12 @@ Coverage includes sign-in and invalid/expired keys, session storage and sign-out
 question/follow-up payloads, safe answer formatting, keyboard-accessible sources,
 security warnings, rate limits, document search/status filters, invalid and
 oversized files, multipart upload, processing polls, drag-and-drop concurrency,
-delete cancellation/success/failure, connectivity recovery, empty states,
-conversation retention between sections, reduced motion, and responsive layouts
-at 320, 390, 768, 1024, and 1440 pixels.
+delete cancellation/success/failure, connectivity recovery, outages on first
+load, empty states, conversation retention between sections, answer placement,
+formatting and announcement, retained failed questions, view URLs with Back,
+reload and per-view scroll, starter cards staying clear of the composer from
+600 to 1080 pixels tall, reduced motion, and responsive layouts at 320, 390,
+768, 1024, and 1440 pixels.
 
 These checks verify frontend behavior and API request compatibility. They do not
 replace a live backend test of PDF ingestion, retrieval, or model generation.
