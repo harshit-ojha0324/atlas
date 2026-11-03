@@ -177,9 +177,17 @@ async function noOverflow(page, label) {
       'prompt card leaves the cursor after the starter',
     );
     await page.keyboard.type('annual leave');
+    const statusRegion = await page.locator('.ask > [role="status"]').elementHandle();
     await page.locator('.composer').getByRole('button', { name: 'Ask Atlas', exact: true }).click();
-    await visible(page, 'Reading your documents…');
+    await page.locator('.thinking').waitFor();
     await visible(page, 'Answered by Gemini');
+    check(
+      await page.locator('.ask > [role="status"]').evaluate(
+        (el, region) => el === region && el.textContent.startsWith('Answer ready. Employees receive 25 days'),
+        statusRegion,
+      ),
+      'the answer is announced from a region that stayed mounted',
+    );
     check(asks[0].history.length === 0, 'first question has empty history');
     check(asks[0].question === 'What does my library say about annual leave', 'the completed question is sent');
     check(

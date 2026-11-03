@@ -111,7 +111,7 @@ function Turn({ turn }) {
         <span className="response-line" />
       </div>
       {turn.pending ? (
-        <div className="answer-loading" role="status">
+        <div className="answer-loading">
           <p className="thinking">
             <Loader size={15} className="spin" />
             Reading your documents…
@@ -240,6 +240,15 @@ function Ask({ readyCount, loading, loaded, onOpenLibrary }) {
     setTurns((prev) => [...prev.slice(0, -1), done]);
   };
 
+  // Focus stays in the composer, so answers are read out from a region that is
+  // always mounted. Errors announce themselves with role="alert".
+  const last = turns[turns.length - 1];
+  const announcement = !last || last.error
+    ? ''
+    : last.pending
+      ? 'Reading your documents…'
+      : `Answer ready. ${last.answer.replace(/[*`#]/g, '')}`;
+
   const firstDocument = !readyCount && loaded && (
     <div className="first-document">
       <BookOpen size={18} />
@@ -255,6 +264,9 @@ function Ask({ readyCount, loading, loaded, onOpenLibrary }) {
 
   return (
     <div className="ask">
+      <p className="sr-only" role="status">
+        {announcement}
+      </p>
       <div className="section-topline">
         <p className="eyebrow">
           <span /> YOUR KNOWLEDGE, CONNECTED
