@@ -116,20 +116,20 @@ function Library({ documents, onChange, loading, loaded }) {
       </div>
       <div className="library-stats">
         <div>
-          <span>DOCUMENTS</span>
+          <span>Documents</span>
           <strong>{loaded ? String(documents.length).padStart(2, '0') : '—'}</strong>
         </div>
         <div>
           <span>
             <i className="stat-dot ready" />
-            READY TO EXPLORE
+            Ready to explore
           </span>
           <strong>{loaded ? String(ready).padStart(2, '0') : '—'}</strong>
         </div>
         <div>
           <span>
             <i className="stat-dot pending" />
-            PROCESSING
+            Processing
           </span>
           <strong>{loaded ? String(pending).padStart(2, '0') : '—'}</strong>
         </div>

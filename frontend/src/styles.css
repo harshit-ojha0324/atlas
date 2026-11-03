@@ -771,9 +771,6 @@ h1 em,
   align-items: center;
   gap: 5px;
 }
-.composer-meta > span:last-child {
-  letter-spacing: 0.1em;
-}
 kbd {
   font: var(--text-label) var(--sans);
   border: 1px solid var(--line);
@@ -847,7 +844,6 @@ kbd {
 }
 .question-label {
   font-size: var(--text-meta);
-  letter-spacing: 0.17em;
   color: var(--subtle);
 }
 .turn h3 {
@@ -959,7 +955,6 @@ kbd {
   align-items: center;
   color: var(--muted);
   font-size: var(--text-meta);
-  letter-spacing: 0.12em;
   margin-bottom: 9px;
 }
 .sources-heading > span {
@@ -1078,7 +1073,6 @@ kbd {
   gap: 6px;
   color: var(--muted);
   font-size: var(--text-meta);
-  letter-spacing: 0.1em;
 }
 .library-stats strong {
   font-size: var(--text-heading);
@@ -1925,7 +1919,6 @@ kbd {
   }
   .library-stats span {
     gap: 4px;
-    letter-spacing: 0.06em;
   }
   .dropzone {
     padding: 19px 15px;

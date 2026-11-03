@@ -107,7 +107,7 @@ function Turn({ turn }) {
   return (
     <article className="turn">
       <div className="turn-question">
-        <span className="question-label">YOU ASKED</span>
+        <span className="question-label">You asked</span>
         <h3>{turn.question}</h3>
       </div>
       <div className="response-heading">
@@ -148,7 +148,7 @@ function Turn({ turn }) {
           {turn.sources?.length > 0 && (
             <div className="sources">
               <p className="sources-heading">
-                <BookOpen size={14} /> SOURCES <span>{turn.sources.length}</span>
+                <BookOpen size={14} /> Sources <span>{turn.sources.length}</span>
               </p>
               <ol>
                 {turn.sources.map((s, i) => (
@@ -388,7 +388,7 @@ function Ask({ readyCount, loading, loaded, onOpenLibrary }) {
             Grounded in your library. Always check the sources.
           </span>
           <span>
-            ENTER TO ASK <kbd>↵</kbd>
+            Enter to ask <kbd>↵</kbd>
           </span>
         </div>
       </div>
