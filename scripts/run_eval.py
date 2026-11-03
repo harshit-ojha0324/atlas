@@ -12,13 +12,15 @@ Gated (exit 1 below --threshold):
 - grounded-response rate: an answerable question gets an answer (not "not in
   your documents") citing the right page, with the gold fact in the retrieved
   text; an out-of-scope question is declined without an LLM call (the relevance
-  floor). With --judge-answers, the answer itself must contain the gold fact:
-  use it only when forge has a real model behind it, not the mocks.
+  floor). With --judge-answers, the answer itself must contain the gold fact
+  and a citation [n] to the source on the right page: use it only when forge
+  has a real model behind it, not the mocks.
 
 Needs the stack up (`make up`). Run: make eval
 """
 
 import argparse
+import re
 import sys
 import textwrap
 import time
@@ -28,6 +30,13 @@ from eval_set import CORPUS, GOLD
 from stack import create_tenant, delete_tenants, make_pdf
 
 PAGE_OF = {passage["id"]: page for page, passage in enumerate(CORPUS, 1)}
+
+
+def cites_page(out: dict, pages: set[int]) -> bool:
+    """Whether a citation like [1] or [1, 2] in the answer points at a source on one of these pages."""
+    sources = out["sources"]
+    numbers = [int(n) for m in re.findall(r"\[(\d[\d,\s]*)\]", out["answer"]) for n in m.split(",")]
+    return any(1 <= n <= len(sources) and sources[n - 1]["page"] in pages for n in numbers)
 
 
 def main() -> None:
@@ -66,7 +75,7 @@ def main() -> None:
                     not declined
                     and bool(want & {s["page"] for s in out["sources"]})
                     and any(fact in h["text"].lower() for h in results)
-                    and (not args.judge_answers or fact in out["answer"].lower())
+                    and (not args.judge_answers or (fact in out["answer"].lower() and cites_page(out, want)))
                 )
                 kind = f"ANSW hit@1={int(bool(hit1))} hit@{args.k}={int(hitk)}"
             else:
