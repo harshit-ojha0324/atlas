@@ -1,10 +1,13 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import { AnimatePresence, animate, motion, useMotionValue, useReducedMotion, useTransform } from 'motion/react';
 import { Upload, Trash2, Loader, FileText, Search, BookOpen, Check, CloudOff, X } from 'lucide-react';
 import api from '../services/api';
 
 const MAX_BYTES = 10 * 1024 * 1024; // the API's upload limit
 
 const STATUS_LABEL = { ready: 'Ready', pending: 'Processing', failed: 'Failed' };
+
+const ROW_SPRING = { type: 'spring', stiffness: 450, damping: 38 };
 
 // An upload returns at once as "pending"; a worker then reads, splits and
 // indexes it. App re-reads the list while anything is pending, so each status
@@ -15,6 +18,18 @@ function detail(doc) {
   }
   if (doc.status === 'failed') return doc.error || 'Processing failed';
   return 'Reading and indexing';
+}
+
+// A count that runs to its new value instead of swapping.
+function Count({ value }) {
+  const current = useMotionValue(value);
+  const text = useTransform(current, (v) => String(Math.round(v)).padStart(2, '0'));
+  const reduced = useReducedMotion();
+  useEffect(() => {
+    const run = animate(current, value, { duration: reduced ? 0 : 0.6, ease: 'easeOut' });
+    return () => run.stop();
+  }, [value, current, reduced]);
+  return <motion.strong>{text}</motion.strong>;
 }
 
 function Library({ documents, onChange, loading, loaded }) {
@@ -95,43 +110,28 @@ function Library({ documents, onChange, loading, loaded }) {
 
   return (
     <section className="library">
-      <div className="section-topline">
-        <p className="eyebrow">
-          <span /> THE FOUNDATION OF EVERY ANSWER
-        </p>
-        <span className="section-index">02 / COLLECT</span>
-      </div>
       <div className="library-heading">
-        <div>
-          <h1>
-            Your library.
-            <br />
-            <em>A world of possibilities.</em>
-          </h1>
-          <p className="lede">A home for the documents that shape your thinking.</p>
-        </div>
-        <span className="library-heading-mark">
-          <BookOpen size={38} strokeWidth={1} />
-        </span>
+        <h1>What Atlas carries.</h1>
+        <p className="lede">Every answer stands on these documents. Add one and it joins the stars.</p>
       </div>
       <div className="library-stats">
         <div>
           <span>Documents</span>
-          <strong>{loaded ? String(documents.length).padStart(2, '0') : '—'}</strong>
+          {loaded ? <Count value={documents.length} /> : <strong>—</strong>}
         </div>
         <div>
           <span>
             <i className="stat-dot ready" />
-            Ready to explore
+            Ready to ask
           </span>
-          <strong>{loaded ? String(ready).padStart(2, '0') : '—'}</strong>
+          {loaded ? <Count value={ready} /> : <strong>—</strong>}
         </div>
         <div>
           <span>
             <i className="stat-dot pending" />
             Processing
           </span>
-          <strong>{loaded ? String(pending).padStart(2, '0') : '—'}</strong>
+          {loaded ? <Count value={pending} /> : <strong>—</strong>}
         </div>
       </div>
 
@@ -147,9 +147,7 @@ function Library({ documents, onChange, loading, loaded }) {
           {uploading ? <Loader size={24} className="spin" /> : <Upload size={24} />}
         </div>
         <div className="dropzone-text">
-          <strong>
-            {uploading ? 'Making room for new knowledge…' : 'Give your curiosity something to work with.'}
-          </strong>
+          <strong>{uploading ? 'Taking up the weight…' : 'Give Atlas something to carry.'}</strong>
           <span>Drop a PDF here or choose a file. Up to 10 MB per document.</span>
         </div>
         <button
@@ -187,11 +185,9 @@ function Library({ documents, onChange, loading, loaded }) {
       )}
 
       <div className="library-toolbar">
-        <h2>
-          Your documents {loaded && <span>{documents.length}</span>}
-        </h2>
+        <h2>Your documents {loaded && <span>{documents.length}</span>}</h2>
         <div className="library-controls">
-          <div className="search-field">
+          <label className="search-field">
             <Search size={15} />
             <input
               aria-label="Search documents"
@@ -199,7 +195,7 @@ function Library({ documents, onChange, loading, loaded }) {
               value={query}
               onChange={(e) => setQuery(e.target.value)}
             />
-          </div>
+          </label>
           <select aria-label="Filter by status" value={filter} onChange={(e) => setFilter(e.target.value)}>
             <option value="all">All statuses</option>
             <option value="ready">Ready</option>
@@ -215,19 +211,19 @@ function Library({ documents, onChange, loading, loaded }) {
           <div className="skeleton" />
         </div>
       ) : !loaded ? (
-        <div className="doc-empty">
+        <div className="doc-empty panel">
           <CloudOff size={28} strokeWidth={1.3} />
           <h3>Your documents couldn’t be loaded.</h3>
           <p>Atlas isn’t reachable, so nothing can be listed yet. Use Retry at the top of the page.</p>
         </div>
       ) : documents.length === 0 ? (
-        <div className="doc-empty">
+        <div className="doc-empty panel">
           <BookOpen size={30} strokeWidth={1.3} />
-          <h3>A blank page. Endless potential.</h3>
+          <h3>Nothing to carry yet.</h3>
           <p>Your library is empty. Add a PDF to start asking questions.</p>
         </div>
       ) : filtered.length === 0 ? (
-        <div className="doc-empty">
+        <div className="doc-empty panel">
           <Search size={25} />
           <h3>No documents found.</h3>
           <p>Try another name or change the status filter.</p>
@@ -243,30 +239,52 @@ function Library({ documents, onChange, loading, loaded }) {
         </div>
       ) : (
         <ul className="doc-list">
-          {filtered.map((doc) => (
-            <li className="doc" key={doc.id}>
-              <div className="file-icon">
-                <FileText size={21} strokeWidth={1.5} />
-                <span>PDF</span>
-              </div>
-              <div className="doc-main">
-                <p className="doc-name" title={doc.name}>
-                  {doc.name}
-                </p>
-                <p className={doc.status === 'failed' ? 'doc-detail failed' : 'doc-detail'}>{detail(doc)}</p>
-              </div>
-              <span className={`status ${doc.status}`}>{STATUS_LABEL[doc.status] ?? doc.status}</span>
-              <button
-                className="delete"
-                onClick={() => remove(doc)}
-                disabled={deletingId === doc.id}
-                aria-label={`Delete ${doc.name}`}
-                title="Delete"
+          <AnimatePresence initial={false} mode="popLayout">
+            {filtered.map((doc) => (
+              <motion.li
+                className="doc"
+                data-status={doc.status}
+                key={doc.id}
+                layout="position"
+                initial={{ opacity: 0, scale: 0.98 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.98 }}
+                transition={ROW_SPRING}
               >
-                {deletingId === doc.id ? <Loader size={16} className="spin" /> : <Trash2 size={16} />}
-              </button>
-            </li>
-          ))}
+                <div className="file-icon">
+                  <FileText size={21} strokeWidth={1.5} />
+                  <span>PDF</span>
+                </div>
+                <div className="doc-main">
+                  <p className="doc-name" title={doc.name}>
+                    {doc.name}
+                  </p>
+                  <p className={doc.status === 'failed' ? 'doc-detail failed' : 'doc-detail'}>{detail(doc)}</p>
+                </div>
+                <AnimatePresence initial={false} mode="wait">
+                  <motion.span
+                    key={doc.status}
+                    className={`status ${doc.status}`}
+                    initial={{ opacity: 0, scale: 0.86 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    exit={{ opacity: 0, scale: 0.86 }}
+                    transition={{ duration: 0.18 }}
+                  >
+                    {STATUS_LABEL[doc.status] ?? doc.status}
+                  </motion.span>
+                </AnimatePresence>
+                <button
+                  className="delete"
+                  onClick={() => remove(doc)}
+                  disabled={deletingId === doc.id}
+                  aria-label={`Delete ${doc.name}`}
+                  title="Delete"
+                >
+                  {deletingId === doc.id ? <Loader size={16} className="spin" /> : <Trash2 size={16} />}
+                </button>
+              </motion.li>
+            ))}
+          </AnimatePresence>
         </ul>
       )}
       <p className="library-footnote">

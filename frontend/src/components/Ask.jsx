@@ -1,4 +1,5 @@
 import { Fragment, useState, useRef, useEffect } from 'react';
+import { motion } from 'motion/react';
 import {
   ArrowRight,
   ArrowUp,
@@ -13,7 +14,6 @@ import {
   Sparkles,
 } from 'lucide-react';
 import Sphere from './Sphere';
-import Observatory from './Observatory';
 import api from '../services/api';
 
 // The API accepts up to 20 history messages (10 question-answer turns) of up to
@@ -50,6 +50,13 @@ function inline(text, cite) {
       return part;
     });
 }
+
+// what an answer does as it lands: rises once, and isn't replayed on returning to the view
+const RISE = {
+  initial: { opacity: 0, y: 10 },
+  animate: { opacity: 1, y: 0 },
+  transition: { duration: 0.42, ease: [0.22, 1, 0.36, 1] },
+};
 
 const scrollBehavior = () =>
   window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'instant' : 'smooth';
@@ -165,7 +172,7 @@ function Turn({ turn }) {
   const someUncited = turn.sources?.some((_, i) => uncited(i + 1));
 
   return (
-    <article className="turn">
+    <motion.article className="turn" {...RISE}>
       <div className="turn-question">
         <span className="question-label">You asked</span>
         <h3>{turn.question}</h3>
@@ -178,8 +185,8 @@ function Turn({ turn }) {
       {turn.pending ? (
         <div className="answer-loading">
           <p className="thinking">
-            <Loader size={15} className="spin" />
-            Reading your documents…
+            <Sphere className="sphere-turning" strokeWidth={5} />
+            Atlas is reading your documents…
           </p>
           <div className="skeleton" />
           <div className="skeleton" />
@@ -192,9 +199,9 @@ function Turn({ turn }) {
               {turn.answer}
             </p>
           ) : (
-            <div className="answer">
+            <motion.div className="answer" {...RISE}>
               <Prose text={turn.answer} cite={cite} />
-            </div>
+            </motion.div>
           )}
 
           {turn.warnings?.length > 0 && (
@@ -253,17 +260,21 @@ function Turn({ turn }) {
           )}
         </>
       )}
-    </article>
+    </motion.article>
   );
 }
 
-function Ask({ readyCount, loading, loaded, onOpenLibrary }) {
+function Ask({ readyCount, loading, loaded, onOpenLibrary, onStateChange }) {
   const [turns, setTurns] = useState([]);
   const [input, setInput] = useState('');
   const threadRef = useRef(null);
   const inputRef = useRef(null);
   const busy = turns.some((t) => t.pending);
   const unfinished = STARTERS.some(([, , , starter]) => input === starter); // a card's starter, no topic yet
+
+  useEffect(() => {
+    onStateChange({ busy, hasThread: turns.length > 0 });
+  }, [busy, turns.length, onStateChange]);
 
   // Bring the newest question to the top, so a long answer is read from its start.
   useEffect(() => {
@@ -326,8 +337,8 @@ function Ask({ readyCount, loading, loaded, onOpenLibrary }) {
     <div className="first-document">
       <BookOpen size={18} />
       <div>
-        <strong>A great answer starts with a source.</strong>
-        <span>Add your first PDF to begin exploring.</span>
+        <strong>Atlas has nothing to carry yet.</strong>
+        <span>Add your first PDF, then ask about it.</span>
       </div>
       <button className="text-button" onClick={onOpenLibrary}>
         Open library <ArrowRight size={16} />
@@ -340,43 +351,32 @@ function Ask({ readyCount, loading, loaded, onOpenLibrary }) {
       <p className="sr-only" role="status">
         {announcement}
       </p>
-      <div className="section-topline">
-        <p className="eyebrow">
-          <span /> YOUR KNOWLEDGE, CONNECTED
-        </p>
-        <span className="section-index">01 / DISCOVER</span>
-      </div>
       {turns.length === 0 ? (
         <>
           <section className="empty">
             <div className="hero-copy">
-              <div className="hero-kicker">
-                <span className="tiny-star">✦</span> A little curiosity goes a long way.
-              </div>
               <h1>
-                A world of knowledge.
+                The weight of knowledge.
                 <br />
-                <em>Within reach.</em>
+                <em>Lifted.</em>
               </h1>
               <p>
-                Turn the documents you carry into the answers you need. Ask freely. Explore deeply. Every
-                insight has a source.
+                Give Atlas your documents. Ask what you need to know, and follow every answer back to the page
+                it came from.
               </p>
               <div className="hero-proof">
                 <ShieldCheck size={15} />
-                <span>Your documents. Your workspace. Your answers.</span>
+                <span>Private to your workspace.</span>
               </div>
             </div>
-            <Observatory />
           </section>
           {firstDocument || (
             <section className="discovery" aria-labelledby="discovery-title">
               <div className="discovery-heading">
-                <h2 id="discovery-title">Where will your curiosity take you?</h2>
-                <span>START WITH A QUESTION</span>
+                <h2 id="discovery-title">Start with a question</h2>
               </div>
               <div className="prompt-grid">
-                {STARTERS.map(([Icon, title, description, starter], i) => (
+                {STARTERS.map(([Icon, title, description, starter]) => (
                   <button
                     className="prompt-card"
                     key={title}
@@ -392,7 +392,6 @@ function Ask({ readyCount, loading, loaded, onOpenLibrary }) {
                   >
                     <div className="prompt-card-top">
                       <Icon size={19} />
-                      <span>0{i + 1}</span>
                     </div>
                     <h3>
                       {title}
@@ -408,7 +407,7 @@ function Ask({ readyCount, loading, loaded, onOpenLibrary }) {
       ) : (
         <div className="thread" aria-busy={busy} ref={threadRef}>
           <div className="thread-heading">
-            <h1>Follow your curiosity.</h1>
+            <h1>Atlas answers.</h1>
             <span>
               {turns.length} question{turns.length !== 1 ? 's' : ''}
             </span>

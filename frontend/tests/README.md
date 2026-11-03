@@ -19,7 +19,7 @@ node frontend/tests/ui-smoke.cjs
 ```
 
 If Playwright is provided by an external toolchain, use `NODE_PATH` to point to
-that toolchain's `node_modules` directory. No application dependencies were added.
+that toolchain's `node_modules` directory.
 
 Optional environment variables:
 
@@ -36,8 +36,8 @@ load, empty states, conversation retention between sections, answer placement,
 formatting and announcement, citations that open their source and return,
 retained failed questions, view URLs with Back,
 reload and per-view scroll, starter cards staying clear of the composer from
-600 to 1080 pixels tall, reduced motion, and responsive layouts at 320, 390,
-768, 1024, and 1440 pixels.
+600 to 1080 pixels tall, the titan scene following app state, reduced motion,
+and responsive layouts at 320, 390, 768, 1024, and 1440 pixels.
 
 These checks verify frontend behavior and API request compatibility. They do not
 replace a live backend test of PDF ingestion, retrieval, or model generation.

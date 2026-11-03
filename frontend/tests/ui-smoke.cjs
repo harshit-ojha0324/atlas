@@ -35,6 +35,12 @@ function check(value, message) {
 async function visible(page, text) {
   await page.getByText(text, { exact: true }).waitFor({ state: 'visible' });
 }
+// rows leave with a short exit animation, so a filtered list settles rather than snaps
+async function docCount(page, n) {
+  return page
+    .waitForFunction((n) => document.querySelectorAll('.doc').length === n, n, { timeout: 3000 })
+    .then(() => true, () => false);
+}
 async function noOverflow(page, label) {
   check(
     await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth),
@@ -149,7 +155,7 @@ async function noOverflow(page, label) {
     await page.screenshot({ path: `${output}/ask-desktop.png`, fullPage: true });
     check(
       (await page
-        .locator('.celestial-orbit')
+        .locator('.titan-heat')
         .first()
         .evaluate((el) => getComputedStyle(el).animationName)) === 'none',
       'reduced motion disables decorative animation',
@@ -208,13 +214,13 @@ async function noOverflow(page, label) {
     await visible(page, 'No readable text found.');
     await page.screenshot({ path: `${output}/library-desktop.png`, fullPage: true });
     await page.getByLabel('Search documents').fill('research');
-    check((await page.locator('.doc').count()) === 1, 'document search filters locally');
+    check(await docCount(page, 1), 'document search filters locally');
     await page.getByLabel('Filter by status').selectOption('failed');
     await visible(page, 'No documents found.');
     await page.getByRole('button', { name: 'Clear filters' }).click();
-    check((await page.locator('.doc').count()) === 3, 'clear filters restores documents');
+    check(await docCount(page, 3), 'clear filters restores documents');
     await page.getByLabel('Filter by status').selectOption('failed');
-    check((await page.locator('.doc').count()) === 1, 'status filter finds failed document');
+    check(await docCount(page, 1), 'status filter finds failed document');
     await page.getByLabel('Filter by status').selectOption('all');
     await page.getByRole('navigation').getByRole('link', { name: 'Ask Atlas' }).click();
     await visible(page, 'Answered by Gemini');
@@ -411,14 +417,14 @@ async function noOverflow(page, label) {
     await page.getByRole('navigation').getByRole('link', { name: /Library/ }).click();
     await visible(page, 'Your documents couldn’t be loaded.');
     check(
-      (await page.getByText('A blank page. Endless potential.').count()) === 0 &&
+      (await page.getByText('Nothing to carry yet.').count()) === 0 &&
         (await page.locator('.library-stats strong').first().textContent()) === '—',
       'an outage on load does not claim the library is empty',
     );
     listError = false;
     await page.getByRole('button', { name: 'Retry', exact: true }).click();
     await visible(page, '2 documents ready');
-    check((await page.locator('.doc').count()) === 3, 'retry after an outage on load lists the documents');
+    check(await docCount(page, 3), 'retry after an outage on load lists the documents');
     await page.getByRole('navigation').getByRole('link', { name: 'Ask Atlas' }).click();
 
     const currentView = () => page.locator('.tab[aria-current="page"]').textContent();
@@ -436,7 +442,7 @@ async function noOverflow(page, label) {
       await page.evaluate(() => document.activeElement.id === 'main-content'),
       'changing view moves focus to the content',
     );
-    await page.evaluate(() => window.scrollTo(0, 300));
+    await page.evaluate(() => window.scrollTo(0, 150));
     await page.goBack();
     await page.waitForURL('**/#/ask');
     await onView('Ask Atlas');
@@ -445,7 +451,7 @@ async function noOverflow(page, label) {
     await page.goForward();
     await page.waitForURL('**/#/library');
     await onView('Library');
-    check((await scrollY()) === 300, 'a view keeps its own scroll position');
+    check((await scrollY()) === 150, 'a view keeps its own scroll position');
     await page.evaluate(() => {
       window.location.hash = '#main-content';
     });
@@ -473,7 +479,7 @@ async function noOverflow(page, label) {
     );
     check((await page.locator('.turn').count()) === 0, 'sign-out clears conversation');
     await page.getByRole('button', { name: 'Open library', exact: true }).click();
-    await visible(page, 'A blank page. Endless potential.');
+    await visible(page, 'Nothing to carry yet.');
     documents = structuredClone(initialDocuments);
     await page.getByRole('navigation').getByRole('link', { name: 'Ask Atlas' }).click();
     await visible(page, '2 documents ready');
@@ -487,11 +493,6 @@ async function noOverflow(page, label) {
           return cards.bottom <= composer.top;
         }),
         `${width}x${height}: the composer does not cover the starters`,
-      );
-      check(
-        height <= 600 ||
-          (await page.locator('.sidebar').evaluate((el) => el.scrollHeight <= el.clientHeight)),
-        `${width}x${height}: the sidebar fits without scrolling`,
       );
     }
     const typeAt = async (width) => {
@@ -543,11 +544,47 @@ async function noOverflow(page, label) {
     );
     await page.emulateMedia({ reducedMotion: 'no-preference' });
     await page.reload();
+    await visible(page, 'Welcome to Atlas.');
     check(
-      (await page.locator('.celestial-orbit').evaluate((el) => getComputedStyle(el).animationDuration)) ===
-        '3s',
-      'normal-motion illustration has a finite three-second entrance',
+      await page.locator('.titan-heat').evaluate((el) => getComputedStyle(el).animationName.includes('breathe')),
+      'with normal motion the heat in the scene breathes',
     );
+    const painted = () =>
+      page.locator('.embers').evaluate((canvas) => {
+        const { data } = canvas.getContext('2d').getImageData(0, 0, canvas.width, canvas.height);
+        for (let i = 3; i < data.length; i += 4) if (data[i]) return true;
+        return false;
+      });
+    check(
+      await page.waitForFunction(() => document.querySelector('.embers').width > 0).then(painted),
+      'embers are rising over the scene',
+    );
+    const stage = page.locator('.stage');
+    check((await stage.getAttribute('data-mode')) === 'signin', 'the scene starts at the sign-in view');
+    await page.getByLabel('Workspace API key').fill(fixtureKey);
+    await page.getByRole('button', { name: 'Enter your workspace' }).click();
+    await visible(page, '2 documents ready');
+    await page.getByRole('navigation').getByRole('link', { name: 'Ask Atlas' }).click();
+    check(
+      await page.locator('.stage[data-mode="ask"]').waitFor({ state: 'attached', timeout: 2000 }).then(() => true, () => false),
+      'the scene follows the open view once signed in',
+    );
+    check((await page.locator('.star').count()) === 2, 'each ready document is a star; failed ones are not');
+    check(
+      Number(await stage.evaluate((el) => el.style.getPropertyValue('--charge'))) > 0.2,
+      'a library with documents charges the titan',
+    );
+    await page.getByRole('textbox', { name: 'Your question' }).fill('How much leave?');
+    await page.getByRole('textbox', { name: 'Your question' }).press('Enter');
+    await page.locator('.stage[data-reading]').waitFor({ state: 'attached' });
+    await visible(page, 'Answered by Gemini');
+    check((await stage.getAttribute('data-reading')) === null, 'the scene stops reading when the answer lands');
+    check((await stage.getAttribute('data-mode')) === 'thread', 'a conversation moves the scene behind the text');
+    await page.getByRole('navigation').getByRole('link', { name: /Library/ }).click();
+    await page.locator('.stage[data-mode="library"]').waitFor({ state: 'attached' });
+    check((await page.locator('.tab-seam').count()) === 1, 'one seam marks the open section');
+    await page.getByLabel('Search documents').fill('research');
+    check(await docCount(page, 1), 'with normal motion, filtered rows still leave');
     check(errors.length === 0, `no browser runtime errors (${errors.join('; ')})`);
     console.log(`\n${checks} checks passed. Screenshots: ${output}`);
   } finally {

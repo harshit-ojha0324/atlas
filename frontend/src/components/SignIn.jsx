@@ -1,7 +1,6 @@
 import { useState } from 'react';
-import { ArrowRight, BookOpen, KeyRound, Loader, ShieldCheck } from 'lucide-react';
+import { ArrowRight, BookOpen, Loader, ShieldCheck } from 'lucide-react';
 import Sphere from './Sphere';
-import Observatory from './Observatory';
 import api, { setKey, clearKey } from '../services/api';
 
 // The tenant's API key is the sign-in: it's checked against the API, then kept
@@ -36,42 +35,20 @@ function SignIn({ onSignIn }) {
     <main className="signin">
       <section className="signin-story" aria-label="About Atlas">
         <div className="brand">
-          <Sphere strokeWidth={2} />
-          <span>
-            atlas<span className="brand-period">.</span>
-          </span>
+          <Sphere strokeWidth={3} />
+          <span>Atlas</span>
         </div>
         <div className="signin-story-content">
-          <p className="eyebrow">
-            <span /> KNOWLEDGE HAS NO HORIZON
-          </p>
           <h1>
-            Carry the knowledge.
+            He holds up the sky.
             <br />
-            <em>Discover the world.</em>
+            <em>You ask the questions.</em>
           </h1>
-          <p className="signin-description">
-            Your documents hold a universe of answers.
-            <br />
-            Atlas helps you find your way.
-          </p>
-          <Observatory />
-        </div>
-        <div className="signin-story-footer">
-          <span>INSPIRED BY CURIOSITY.</span>
-          <span>GROUNDED IN YOUR SOURCES.</span>
         </div>
       </section>
       <div className="signin-inner">
-        <div className="signin-form-content">
-          <div className="signin-icon">
-            <KeyRound size={23} />
-          </div>
-          <p className="eyebrow">YOUR NEXT DISCOVERY STARTS HERE</p>
+        <div className="signin-form-content panel">
           <h2>Welcome to Atlas.</h2>
-          <p className="signin-tagline">
-            A little less searching. <br />A lot more understanding.
-          </p>
           <form onSubmit={handleSubmit}>
             {error && (
               <p className="notice error" role="alert">
@@ -106,13 +83,9 @@ function SignIn({ onSignIn }) {
           </p>
           <div className="signin-how">
             <BookOpen size={20} />
-            <div>
-              <strong>Your documents. Your discoveries.</strong>
-              <p>Upload a PDF, ask a question, and follow every answer back to its source.</p>
-            </div>
+            <p>Upload a PDF, ask a question, and follow every answer back to its source.</p>
           </div>
         </div>
-        <p className="signin-bottom">A private space for a curious mind.</p>
       </div>
     </main>
   );
