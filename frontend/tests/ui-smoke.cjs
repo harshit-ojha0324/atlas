@@ -281,6 +281,7 @@ async function noOverflow(page, label) {
       sources: [
         answer.sources[0],
         { document: 'Research notes.pdf', page: 2, excerpt: 'The carry-over policy applies after one year.' },
+        { document: 'Benefits overview.pdf', page: 1, excerpt: 'An overview of employee benefits.' },
       ],
     };
     await page.getByRole('textbox', { name: 'Your question' }).fill('How much leave?');
@@ -296,6 +297,16 @@ async function noOverflow(page, label) {
     check(
       await page.locator('.ask > [role="status"]').evaluate((el) => !/\[\d/.test(el.textContent.replace('[2026]', ''))),
       'citation markers are not read out with the answer',
+    );
+    check(
+      (await cited.locator('.sources-heading').innerText()).includes('2 of 3 cited') &&
+        (await cited.locator('.source.uncited').count()) === 1 &&
+        (await cited.locator('.source').nth(2).innerText()).includes('Page 1, not cited'),
+      'a source the answer never cited is dimmed and says so',
+    );
+    check(
+      (await page.locator('.turn').nth(-2).locator('.source.uncited').count()) === 0,
+      'an answer with no citations leaves its sources undimmed',
     );
     const toSource2 = cited.getByRole('button', { name: 'Source 2: Research notes.pdf, page 2' });
     await toSource2.click();

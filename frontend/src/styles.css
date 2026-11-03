@@ -1001,6 +1001,20 @@ kbd {
 .source.active {
   border-color: var(--gold);
 }
+.source.uncited {
+  background: none;
+}
+.source.uncited summary {
+  color: var(--muted);
+}
+.source.uncited summary:hover {
+  color: var(--gold-bright);
+}
+.source.uncited summary b {
+  color: var(--subtle);
+  background: none;
+  border-color: var(--line);
+}
 .source-back {
   margin-left: 14px;
   padding: 10px 0;

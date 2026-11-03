@@ -30,6 +30,13 @@ const EXCERPT_CHARS = 200;
 const CITATION = /\[\d{1,2}(?:,\s*\d{1,2})*\]/;
 const INLINE = new RegExp(`(\\*\\*[^*]+\\*\\*|\\*[^*\\n]+\\*|${CITATION.source})`);
 
+// The sources a citation names, or null if any number matches no source: then
+// it isn't one of ours (a reference copied from a document, say) and stays text.
+const citedBy = (marker, sources) => {
+  const numbers = marker.match(/\d+/g).map(Number);
+  return numbers.every((n) => sources?.[n - 1]) ? numbers : null;
+};
+
 function inline(text, cite) {
   return text
     .replace(/`/g, '')
@@ -131,8 +138,8 @@ function Turn({ turn }) {
   // ponytail: a number copied from a document's own text links too if it's in
   // range; only structured citations from the API could tell them apart.
   const cite = (marker) => {
-    const numbers = marker.match(/\d+/g).map(Number);
-    if (!numbers.every((n) => turn.sources?.[n - 1])) return marker;
+    const numbers = citedBy(marker, turn.sources);
+    if (!numbers) return marker;
     return numbers.map((n) => {
       const { document, page } = turn.sources[n - 1];
       return (
@@ -149,6 +156,13 @@ function Turn({ turn }) {
       );
     });
   };
+
+  const cited = new Set(
+    (turn.answer?.match(new RegExp(CITATION.source, 'g')) ?? []).flatMap((m) => citedBy(m, turn.sources) ?? []),
+  );
+  // An answer with no citations at all says nothing about which sources it used.
+  const uncited = (n) => cited.size > 0 && !cited.has(n);
+  const someUncited = turn.sources?.some((_, i) => uncited(i + 1));
 
   return (
     <article className="turn">
@@ -194,17 +208,23 @@ function Turn({ turn }) {
           {turn.sources?.length > 0 && (
             <div className="sources" ref={sourcesRef}>
               <p className="sources-heading">
-                <BookOpen size={14} /> Sources <span>{turn.sources.length}</span>
+                <BookOpen size={14} /> Sources{' '}
+                <span>{someUncited ? `${cited.size} of ${turn.sources.length} cited` : turn.sources.length}</span>
               </p>
               <ol>
                 {turn.sources.map((s, i) => (
                   <li key={i}>
-                    <details className={followed?.n === i + 1 ? 'source active' : 'source'}>
+                    <details
+                      className={`source${followed?.n === i + 1 ? ' active' : ''}${uncited(i + 1) ? ' uncited' : ''}`}
+                    >
                       <summary>
                         <b>{i + 1}</b>
                         <span>
                           {s.document}
-                          <small>Page {s.page}</small>
+                          <small>
+                            Page {s.page}
+                            {uncited(i + 1) && ', not cited'}
+                          </small>
                         </span>
                         <Plus size={15} className="source-expand" />
                       </summary>
