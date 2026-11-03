@@ -258,6 +258,22 @@ async function noOverflow(page, label) {
         .then(() => true, () => false),
       'a long answer opens at its question, not its end',
     );
+    nextAnswer = { ...answer, answer: '## Leave policy\n\n1. First step\n2. Second step\n\n3. Third step\n\n<b>Not markup</b>' };
+    await page.getByRole('textbox', { name: 'Your question' }).fill('Give me the steps.');
+    await page.getByRole('textbox', { name: 'Your question' }).press('Enter');
+    await page.locator('.answered-by').nth(4).waitFor();
+    nextAnswer = null;
+    const formatted = page.locator('.answer').last();
+    check((await formatted.locator('h4').textContent()) === 'Leave policy', 'a Markdown heading renders as a heading');
+    check(
+      (await formatted.locator('ol').first().locator('li').count()) === 2 &&
+        (await formatted.locator('ol').nth(1).getAttribute('start')) === '3',
+      'a numbered list renders as a list and keeps its count across a blank line',
+    );
+    check(
+      (await formatted.locator('b').count()) === 0 && (await formatted.innerText()).includes('<b>Not markup</b>'),
+      'HTML in an answer stays plain text',
+    );
 
     await page
       .getByRole('navigation')

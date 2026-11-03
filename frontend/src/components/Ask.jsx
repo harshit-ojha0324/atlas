@@ -24,8 +24,9 @@ const MAX_CHARS = 4000;
 const EXCERPT_CHARS = 200;
 
 // Models answer in Markdown by habit. Render the little they use (paragraphs,
-// "* " or "- " bullets, **bold**, *italic*) as React elements, never as HTML,
-// so an answer can't inject markup. Code ticks are dropped: answers are prose.
+// headings, bulleted and numbered lists, **bold**, *italic*) as React elements,
+// never as HTML, so an answer can't inject markup. Code ticks are dropped:
+// answers are prose.
 function inline(text) {
   return text
     .replace(/`/g, '')
@@ -42,11 +43,19 @@ function inline(text) {
 function Prose({ text }) {
   const blocks = [];
   for (const line of text.split('\n')) {
+    const heading = line.match(/^\s*#{1,6}\s+(.*)/);
     const bullet = line.match(/^\s*[*-]\s+(.*)/);
+    const number = line.match(/^\s*(\d+)[.)]\s+(.*)/);
     const last = blocks[blocks.length - 1];
-    if (bullet) {
+    if (heading) {
+      blocks.push({ type: 'h', lines: [heading[1]] });
+    } else if (bullet) {
       if (last?.type === 'ul') last.lines.push(bullet[1]);
       else blocks.push({ type: 'ul', lines: [bullet[1]] });
+    } else if (number) {
+      // `start` keeps the count when a blank line splits one list in two
+      if (last?.type === 'ol') last.lines.push(number[2]);
+      else blocks.push({ type: 'ol', start: Number(number[1]), lines: [number[2]] });
     } else if (line.trim()) {
       if (last?.type === 'p') last.lines.push(line.trim());
       else blocks.push({ type: 'p', lines: [line.trim()] });
@@ -54,17 +63,13 @@ function Prose({ text }) {
       blocks.push({ type: 'break' });
     }
   }
-  return blocks.map((b, i) =>
-    b.type === 'ul' ? (
-      <ul key={i}>
-        {b.lines.map((l, j) => (
-          <li key={j}>{inline(l)}</li>
-        ))}
-      </ul>
-    ) : b.type === 'p' ? (
-      <p key={i}>{inline(b.lines.join(' '))}</p>
-    ) : null,
-  );
+  return blocks.map((b, i) => {
+    const items = b.lines?.map((l, j) => <li key={j}>{inline(l)}</li>);
+    if (b.type === 'h') return <h4 key={i}>{inline(b.lines[0])}</h4>;
+    if (b.type === 'ul') return <ul key={i}>{items}</ul>;
+    if (b.type === 'ol') return <ol key={i} start={b.start}>{items}</ol>;
+    return b.type === 'p' ? <p key={i}>{inline(b.lines.join(' '))}</p> : null;
+  });
 }
 
 // forge's backend ids, as names
