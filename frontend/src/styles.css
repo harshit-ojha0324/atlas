@@ -1,6 +1,8 @@
 /* Atlas: a celestial archive. All illustration and motion stay on the client. */
-/* Readable text is never set below 11px. Only the lettering drawn inside the
-   observatory and the PDF mark inside file icons are smaller: they're decoration. */
+/* Type sizes come only from the --text-* scale, in rem so they follow the browser's
+   font setting. Breakpoints change layout, not sizes; the display and heading sizes
+   are fluid. Only the lettering drawn inside the observatory and the PDF mark inside
+   file icons sit outside the scale: they're decoration. */
 :root {
   color-scheme: dark;
   --bg: #111615;
@@ -16,6 +18,15 @@
   --failed: #f1a399;
   --sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Helvetica Neue', Arial, sans-serif;
   --serif: 'Iowan Old Style', 'Palatino Linotype', Palatino, 'Book Antiqua', Georgia, serif;
+  --text-label: 0.6875rem; /* decorative tracked capitals only, nothing anyone must read */
+  --text-meta: 0.8125rem; /* secondary details */
+  --text-ui: 0.9375rem; /* controls and supporting text */
+  --text-body: 1rem;
+  --text-lead: 1.125rem; /* answers and questions */
+  --text-title: 1.375rem;
+  --text-heading: clamp(1.75rem, 1.5rem + 1vw, 2rem);
+  --text-brand: 2.25rem;
+  --text-display: clamp(2rem, 1.4rem + 1.9vw, 3.4375rem);
 }
 * {
   box-sizing: border-box;
@@ -39,7 +50,7 @@ body {
   background: var(--bg);
   color: var(--ink);
   font-family: var(--sans);
-  font-size: 14px;
+  font-size: var(--text-body);
   line-height: 1.6;
   -webkit-font-smoothing: antialiased;
 }
@@ -116,7 +127,7 @@ button svg {
   padding: 12px 20px;
   background: var(--gold);
   color: #20251d;
-  font-size: 13px;
+  font-size: var(--text-ui);
   font-weight: 650;
   border: 1px solid var(--gold);
   border-radius: 6px;
@@ -164,7 +175,7 @@ input::placeholder {
   color: var(--gold);
   background: none;
   border: none;
-  font-size: 12px;
+  font-size: var(--text-ui);
   padding: 8px 0;
   font-weight: 550;
 }
@@ -190,7 +201,7 @@ input::placeholder {
   align-items: center;
   gap: 12px;
   padding: 12px 16px;
-  font-size: 13px;
+  font-size: var(--text-ui);
   border: 1px solid;
   border-radius: 6px;
 }
@@ -210,7 +221,7 @@ input::placeholder {
 .eyebrow,
 .section-index,
 .nav-label {
-  font-size: 11px;
+  font-size: var(--text-label);
   font-weight: 550;
   letter-spacing: 0.17em;
 }
@@ -228,6 +239,7 @@ input::placeholder {
   box-shadow: 0 0 12px #d9b67b44;
 }
 h1 {
+  font-size: var(--text-display);
   font-weight: 450;
   letter-spacing: -0.055em;
   line-height: 1.16;
@@ -267,7 +279,7 @@ h1 em,
   color: var(--gold);
 }
 .brand > span {
-  font-size: 37px;
+  font-size: var(--text-brand);
   letter-spacing: -0.06em;
   font-weight: 550;
   line-height: 1.1;
@@ -276,7 +288,7 @@ h1 em,
   color: var(--gold);
 }
 .brand-caption {
-  font-size: 11px;
+  font-size: var(--text-label);
   letter-spacing: 0.04em; /* one line in the sidebar at 11px */
   color: var(--muted);
   margin: 13px 0 30px 4px;
@@ -288,14 +300,14 @@ h1 em,
   border: 1px solid var(--line);
   padding: 12px 10px;
   border-radius: 6px;
-  font-size: 11px;
+  font-size: var(--text-meta);
   font-weight: 550;
 }
 .workspace-label small {
   display: block;
   font-weight: 400;
   color: var(--subtle);
-  font-size: 11px;
+  font-size: var(--text-meta);
   margin-top: 1px;
 }
 .workspace-avatar {
@@ -308,13 +320,12 @@ h1 em,
   border: 1px solid #424435;
   color: var(--gold);
   font-family: var(--serif);
-  font-size: 17px;
+  font-size: var(--text-lead);
   border-radius: 4px;
 }
 .nav-label {
   color: var(--subtle);
   margin: 31px 12px 13px;
-  font-size: 11px;
 }
 .tabs {
   display: flex;
@@ -330,7 +341,7 @@ h1 em,
   border-radius: 5px;
   background: transparent;
   color: var(--muted);
-  font-size: 13px;
+  font-size: var(--text-ui);
   text-decoration: none;
 }
 .tab:hover {
@@ -353,7 +364,7 @@ h1 em,
   opacity: 1;
 }
 .nav-count {
-  font-size: 11px;
+  font-size: var(--text-meta);
   color: var(--muted);
   border-radius: 3px;
   background: #ffffff07;
@@ -379,16 +390,13 @@ h1 em,
   opacity: 0.8;
 }
 .sidebar-note p {
-  font-size: 17px;
+  font-size: var(--text-lead);
   line-height: 1.4;
   letter-spacing: -0.03em;
 }
-.sidebar-note em {
-  font-size: 18px;
-}
 .sidebar-note > span {
   display: block;
-  font-size: 11px;
+  font-size: var(--text-meta);
   color: var(--muted);
   margin: 12px 0 17px;
   max-width: 140px;
@@ -403,7 +411,7 @@ h1 em,
   border-top: 1px solid var(--line);
   background: none;
   color: var(--gold);
-  font-size: 11px;
+  font-size: var(--text-meta);
 }
 .sidebar-note button:hover {
   color: var(--gold-bright);
@@ -413,7 +421,7 @@ h1 em,
   gap: 7px;
   align-items: center;
   margin: 24px 2px 16px;
-  font-size: 11px;
+  font-size: var(--text-meta);
   color: var(--muted);
 }
 .signout {
@@ -425,7 +433,7 @@ h1 em,
   border: 0;
   border-top: 1px solid var(--line);
   padding: 16px 3px 0;
-  font-size: 12px;
+  font-size: var(--text-ui);
   color: var(--muted);
 }
 .signout:hover {
@@ -451,7 +459,7 @@ h1 em,
   display: flex;
   align-items: center;
   gap: 13px;
-  font-size: 12px;
+  font-size: var(--text-meta);
   color: var(--subtle);
 }
 .breadcrumb > span {
@@ -461,7 +469,7 @@ h1 em,
   display: flex;
   align-items: center;
   gap: 8px;
-  font-size: 11px;
+  font-size: var(--text-meta);
   color: var(--muted);
 }
 .connection-dot {
@@ -495,7 +503,6 @@ h1 em,
 }
 .section-index {
   color: var(--subtle);
-  font-size: 11px;
   white-space: nowrap;
 }
 .workspace-footer {
@@ -506,15 +513,18 @@ h1 em,
   padding: 16px 0 19px;
   border-top: 1px solid var(--line);
   color: var(--subtle);
-  font-size: 11px;
+  font-size: var(--text-meta);
 }
 .workspace-footer > span:first-child {
   letter-spacing: 0.16em;
-  font-size: 11px;
+  font-size: var(--text-label);
+}
+.workspace-footer > span:last-child {
+  white-space: nowrap;
 }
 .footer-star {
   color: var(--gold);
-  font-size: 14px;
+  font-size: var(--text-ui);
   margin-left: 10px;
 }
 
@@ -568,7 +578,7 @@ h1 em,
 .orbital-caption {
   display: block;
   text-align: center;
-  font-size: 11px;
+  font-size: var(--text-label);
   letter-spacing: 0.22em;
   opacity: 0.7;
   margin-top: -4px;
@@ -595,32 +605,31 @@ h1 em,
 }
 .hero-kicker {
   color: var(--muted);
-  font-size: 12px;
+  font-size: var(--text-meta);
   display: flex;
   align-items: center;
   gap: 8px;
   margin-bottom: 20px;
 }
 .tiny-star {
-  font-size: 15px;
+  font-size: var(--text-ui);
   color: var(--gold);
 }
 .empty h1 {
-  font-size: clamp(34px, 3.4vw, 55px);
   white-space: nowrap;
 }
 .hero-copy > p {
   color: var(--muted);
-  font-size: 14px;
-  line-height: 1.85;
-  max-width: 350px;
+  font-size: var(--text-body);
+  line-height: 1.7;
+  max-width: 26rem;
   margin-top: 23px;
 }
 .hero-proof {
   display: flex;
   align-items: center;
   gap: 7px;
-  font-size: 11px;
+  font-size: var(--text-meta);
   color: var(--subtle);
   margin-top: 25px;
 }
@@ -638,11 +647,11 @@ h1 em,
   margin-bottom: 16px;
 }
 .discovery-heading h2 {
-  font-size: 13px;
+  font-size: var(--text-body);
   font-weight: 450;
 }
 .discovery-heading > span {
-  font-size: 11px;
+  font-size: var(--text-label);
   letter-spacing: 0.13em;
   color: var(--subtle);
 }
@@ -652,6 +661,9 @@ h1 em,
   gap: 12px;
 }
 .prompt-card {
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-start;
   background: linear-gradient(125deg, #ffffff03, transparent), var(--surface);
   border: 1px solid var(--line);
   border-radius: 6px;
@@ -676,12 +688,12 @@ h1 em,
   color: var(--gold);
 }
 .prompt-card-top > span {
-  font-size: 11px;
+  font-size: var(--text-label);
   color: var(--subtle);
   font-family: monospace;
 }
 .prompt-card h3 {
-  font-size: 14px;
+  font-size: var(--text-body);
   font-weight: 550;
   display: flex;
   justify-content: space-between;
@@ -694,7 +706,7 @@ h1 em,
 }
 .prompt-card p {
   color: var(--muted);
-  font-size: 12px;
+  font-size: var(--text-ui);
   margin-top: 6px;
 }
 .composer {
@@ -731,7 +743,7 @@ h1 em,
 .composer .field {
   border: 0;
   background: none;
-  font-size: 14px;
+  font-size: var(--text-body);
   padding: 8px 0;
   border-radius: 0;
   min-width: 0;
@@ -752,7 +764,7 @@ h1 em,
   gap: 12px;
   padding: 10px 2px 0;
   color: var(--subtle);
-  font-size: 11px;
+  font-size: var(--text-meta);
 }
 .composer-meta > span {
   display: flex;
@@ -760,11 +772,10 @@ h1 em,
   gap: 5px;
 }
 .composer-meta > span:last-child {
-  font-size: 11px;
   letter-spacing: 0.1em;
 }
 kbd {
-  font: 10px var(--sans);
+  font: var(--text-label) var(--sans);
   border: 1px solid var(--line);
   border-radius: 3px;
   padding: 0 4px;
@@ -788,16 +799,13 @@ kbd {
 }
 .first-document strong {
   display: block;
-  font-size: 12px;
+  font-size: var(--text-ui);
   font-weight: 500;
 }
 .first-document span {
   display: block;
   color: var(--muted);
-  font-size: 11px;
-}
-.first-document button {
-  font-size: 11px;
+  font-size: var(--text-meta);
 }
 .thread {
   flex: 1;
@@ -817,11 +825,11 @@ kbd {
 }
 .thread-heading h1 {
   font-family: var(--serif);
-  font-size: 29px;
+  font-size: var(--text-heading);
   letter-spacing: -0.03em;
 }
 .thread-heading > span {
-  font-size: 11px;
+  font-size: var(--text-meta);
   color: var(--subtle);
 }
 .turn {
@@ -838,12 +846,12 @@ kbd {
   margin-bottom: 21px;
 }
 .question-label {
-  font-size: 11px;
+  font-size: var(--text-meta);
   letter-spacing: 0.17em;
   color: var(--subtle);
 }
 .turn h3 {
-  font-size: 17px;
+  font-size: var(--text-lead);
   line-height: 1.5;
   font-weight: 450;
   margin-top: 6px;
@@ -852,7 +860,7 @@ kbd {
   display: flex;
   align-items: center;
   gap: 9px;
-  font-size: 11px;
+  font-size: var(--text-label);
   letter-spacing: 0.15em;
   color: var(--gold);
   margin-bottom: 12px;
@@ -869,7 +877,7 @@ kbd {
 }
 .answer {
   font-family: var(--serif);
-  font-size: 18px;
+  font-size: var(--text-lead);
   line-height: 1.8;
   max-width: 70ch;
 }
@@ -890,7 +898,7 @@ kbd {
 }
 .answer.error {
   font-family: var(--sans);
-  font-size: 13px;
+  font-size: var(--text-ui);
   color: var(--failed);
   padding: 15px;
   border: 1px solid #f1a39944;
@@ -900,7 +908,7 @@ kbd {
   display: flex;
   align-items: center;
   color: var(--subtle);
-  font-size: 11px;
+  font-size: var(--text-meta);
   margin-top: 15px;
 }
 .answered-by::before {
@@ -916,7 +924,7 @@ kbd {
   align-items: center;
   gap: 9px;
   color: var(--gold);
-  font-size: 12px;
+  font-size: var(--text-ui);
   margin-bottom: 18px;
 }
 .skeleton {
@@ -939,7 +947,7 @@ kbd {
   border-left: 2px solid var(--gold);
   background: #d9b67b08;
   color: var(--gold-bright);
-  font-size: 12px;
+  font-size: var(--text-ui);
   margin-top: 18px;
 }
 .sources {
@@ -950,7 +958,7 @@ kbd {
   gap: 7px;
   align-items: center;
   color: var(--muted);
-  font-size: 11px;
+  font-size: var(--text-meta);
   letter-spacing: 0.12em;
   margin-bottom: 9px;
 }
@@ -976,7 +984,7 @@ kbd {
   gap: 12px;
   cursor: pointer;
   padding: 11px 14px;
-  font-size: 13px;
+  font-size: var(--text-ui);
 }
 .source summary::-webkit-details-marker {
   display: none;
@@ -994,13 +1002,13 @@ kbd {
   border-radius: 3px;
   width: 24px;
   height: 26px;
-  font-size: 11px;
+  font-size: var(--text-meta);
   font-weight: 400;
   flex-shrink: 0;
 }
 .source summary small {
   color: var(--subtle);
-  font-size: 11px;
+  font-size: var(--text-meta);
   margin-left: 9px;
 }
 .source-expand {
@@ -1017,7 +1025,7 @@ kbd {
   padding: 13px 0;
   font-family: var(--serif);
   color: var(--muted);
-  font-size: 15px;
+  font-size: var(--text-ui);
   line-height: 1.7;
 }
 
@@ -1032,12 +1040,9 @@ kbd {
   gap: 20px;
   padding: 39px 0 31px;
 }
-.library h1 {
-  font-size: clamp(32px, 3.2vw, 48px);
-}
 .lede {
   color: var(--muted);
-  font-size: 14px;
+  font-size: var(--text-body);
   margin-top: 17px;
 }
 .library-heading-mark {
@@ -1072,11 +1077,11 @@ kbd {
   align-items: center;
   gap: 6px;
   color: var(--muted);
-  font-size: 11px;
+  font-size: var(--text-meta);
   letter-spacing: 0.1em;
 }
 .library-stats strong {
-  font-size: 32px;
+  font-size: var(--text-heading);
   font-weight: 400;
   letter-spacing: -0.03em;
   line-height: 1.4;
@@ -1127,18 +1132,17 @@ kbd {
 }
 .dropzone-text strong {
   display: block;
-  font-size: 14px;
+  font-size: var(--text-body);
   font-weight: 500;
 }
 .dropzone-text span {
   display: block;
   color: var(--muted);
-  font-size: 12px;
+  font-size: var(--text-ui);
   margin-top: 5px;
 }
 .dropzone .btn {
   white-space: nowrap;
-  font-size: 12px;
   padding: 11px 15px;
 }
 .library .notice {
@@ -1155,7 +1159,7 @@ kbd {
   display: flex;
   align-items: center;
   gap: 8px;
-  font-size: 14px;
+  font-size: var(--text-body);
   font-weight: 500;
   white-space: nowrap;
 }
@@ -1165,7 +1169,7 @@ kbd {
   border: 1px solid var(--line);
   border-radius: 4px;
   padding: 0 6px;
-  font-size: 11px;
+  font-size: var(--text-meta);
 }
 .library-controls {
   display: flex;
@@ -1185,8 +1189,8 @@ kbd {
   border-color: var(--gold);
 }
 .search-field input {
-  width: 130px;
-  font-size: 12px;
+  width: 11rem;
+  font-size: var(--text-body);
   background: none;
   border: none;
   min-width: 0;
@@ -1200,7 +1204,7 @@ kbd {
   background: var(--surface);
   border-radius: 4px;
   padding: 7px 8px;
-  font-size: 12px;
+  font-size: var(--text-body);
   color: var(--muted);
 }
 .doc-list {
@@ -1238,7 +1242,7 @@ kbd {
   flex-shrink: 0;
 }
 .file-icon span {
-  font-size: 6px;
+  font-size: 0.375rem;
   line-height: 1;
   letter-spacing: 0.06em;
 }
@@ -1247,26 +1251,27 @@ kbd {
   min-width: 0;
 }
 .doc-name {
-  font-size: 14px;
+  font-size: var(--text-body);
   font-weight: 500;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 .doc-detail {
-  font-size: 12px;
+  font-size: var(--text-meta);
   color: var(--muted);
   margin-top: 4px;
   overflow-wrap: anywhere;
 }
 .doc-detail.failed {
+  font-size: var(--text-ui);
   color: var(--failed);
 }
 .status {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  font-size: 11px;
+  font-size: var(--text-meta);
   padding: 3px 8px;
   border-radius: 4px;
   background: #ffffff03;
@@ -1321,12 +1326,12 @@ kbd {
 }
 .doc-empty h3 {
   font-family: var(--serif);
-  font-size: 22px;
+  font-size: var(--text-title);
   font-weight: 400;
 }
 .doc-empty p {
   color: var(--muted);
-  font-size: 11px;
+  font-size: var(--text-ui);
   margin-top: 7px;
 }
 .doc-empty button {
@@ -1343,7 +1348,7 @@ kbd {
 }
 .library-footnote {
   color: var(--subtle);
-  font-size: 11px;
+  font-size: var(--text-meta);
   margin-top: 18px;
 }
 
@@ -1375,9 +1380,6 @@ kbd {
 .signin-story > * {
   position: relative;
 }
-.signin-story .brand > span {
-  font-size: 35px;
-}
 .signin-story-content {
   flex: 1;
   display: flex;
@@ -1385,16 +1387,12 @@ kbd {
   justify-content: center;
   padding-top: 42px;
 }
-.signin-story .eyebrow {
-  font-size: 11px;
-}
 .signin h1 {
-  font-size: clamp(33px, 3.5vw, 55px);
   margin-top: 22px;
 }
 .signin-description {
   color: var(--muted);
-  font-size: 14px;
+  font-size: var(--text-body);
   line-height: 1.9;
   margin-top: 22px;
 }
@@ -1408,7 +1406,7 @@ kbd {
   display: flex;
   justify-content: space-between;
   gap: 12px;
-  font-size: 11px;
+  font-size: var(--text-label);
   letter-spacing: 0.12em;
   color: var(--subtle);
   border-top: 1px solid var(--line);
@@ -1441,17 +1439,16 @@ kbd {
   margin-bottom: 27px;
 }
 .signin-inner .eyebrow {
-  font-size: 11px;
   letter-spacing: 0.12em;
 }
 .signin h2 {
   font-weight: 450;
-  font-size: 32px;
+  font-size: var(--text-heading);
   letter-spacing: -0.045em;
   margin-top: 13px;
 }
 .signin-tagline {
-  font-size: 14px;
+  font-size: var(--text-body);
   line-height: 1.8;
   color: var(--muted);
   margin-top: 10px;
@@ -1461,32 +1458,31 @@ kbd {
 }
 .signin label {
   display: block;
-  font-size: 13px;
+  font-size: var(--text-ui);
   font-weight: 500;
   margin-bottom: 9px;
 }
 .signin .field {
-  font-size: 13px;
+  font-size: var(--text-body);
 }
 .signin .hint {
-  font-size: 11px;
+  font-size: var(--text-meta);
   color: var(--subtle);
   margin: 9px 0 20px;
 }
 .signin code {
-  font-size: 11px;
+  font-size: var(--text-meta);
   color: var(--muted);
 }
 .signin .btn {
   width: 100%;
   justify-content: space-between;
   padding: 13px 17px;
-  font-size: 14px;
+  font-size: var(--text-body);
 }
 .signin .notice {
   display: block;
   margin-bottom: 20px;
-  font-size: 12px;
 }
 .signin-security {
   display: flex;
@@ -1494,7 +1490,7 @@ kbd {
   justify-content: center;
   gap: 6px;
   color: var(--subtle);
-  font-size: 11px;
+  font-size: var(--text-meta);
   margin-top: 15px;
 }
 .signin-how {
@@ -1511,17 +1507,17 @@ kbd {
   margin-top: 3px;
 }
 .signin-how strong {
-  font-size: 13px;
+  font-size: var(--text-ui);
   font-weight: 500;
 }
 .signin-how p {
-  font-size: 12px;
+  font-size: var(--text-ui);
   color: var(--subtle);
   line-height: 1.8;
   margin-top: 5px;
 }
 .signin-bottom {
-  font-size: 11px;
+  font-size: var(--text-meta);
   color: var(--subtle);
 }
 
@@ -1582,18 +1578,8 @@ kbd {
   .empty > .observatory {
     max-width: 440px;
   }
-  .hero-copy > p {
-    font-size: 13px;
-    max-width: 400px;
-  }
   .prompt-card {
     padding: 25px;
-  }
-  .prompt-card h3 {
-    font-size: 12px;
-  }
-  .prompt-card p {
-    font-size: 11px;
   }
 }
 @media (max-width: 1150px) {
@@ -1619,24 +1605,8 @@ kbd {
     grid-template-columns: 1.4fr 1fr;
     min-height: 340px;
   }
-  .empty h1 {
-    font-size: 36px;
-  }
-  .hero-copy > p {
-    font-size: 13px;
-    max-width: 310px;
-  }
-  .hero-proof {
-    font-size: 11px;
-  }
-  .orbital-caption {
-    font-size: 11px;
-  }
   .prompt-card {
     padding: 16px 13px;
-  }
-  .prompt-card p {
-    font-size: 11px;
   }
   .dropzone {
     padding: 22px 16px;
@@ -1645,12 +1615,6 @@ kbd {
   .upload-icon {
     width: 38px;
     height: 42px;
-  }
-  .dropzone-text strong {
-    font-size: 12px;
-  }
-  .dropzone-text span {
-    font-size: 11px;
   }
   .signin-story {
     padding-left: 35px;
@@ -1670,28 +1634,12 @@ kbd {
   .workspace {
     margin-left: 180px;
   }
-  .brand > span {
-    font-size: 33px;
-  }
-  .brand-caption {
-    font-size: 11px;
-  }
   .workspace-label {
     padding: 10px 8px;
     gap: 7px;
-    font-size: 11px;
-  }
-  .workspace-label small {
-    font-size: 11px;
-  }
-  .workspace-privacy {
-    font-size: 11px;
   }
   .sidebar-note {
     padding: 17px 12px 12px;
-  }
-  .sidebar-note button {
-    font-size: 11px;
   }
   .page {
     padding: 25px 25px 20px;
@@ -1704,19 +1652,12 @@ kbd {
   }
   .empty h1 {
     white-space: normal;
-    font-size: 35px;
   }
   .empty {
     grid-template-columns: 1.5fr 1fr;
     gap: 0;
     min-height: 355px;
     padding: 28px 0;
-  }
-  .hero-kicker {
-    font-size: 12px;
-  }
-  .hero-copy > p {
-    max-width: 300px;
   }
   .hero-proof {
     max-width: 220px;
@@ -1731,11 +1672,7 @@ kbd {
   .prompt-grid {
     gap: 8px;
   }
-  .prompt-card h3 {
-    font-size: 12px;
-  }
   .prompt-card p {
-    font-size: 11px;
     line-height: 1.5;
   }
   .prompt-card-top {
@@ -1772,21 +1709,12 @@ kbd {
   .signin-inner {
     padding: 35px 27px 22px;
   }
-  .signin h1 {
-    font-size: 35px;
-  }
   .signin-story .observatory {
     width: 100%;
   }
   .signin-story-footer {
     flex-direction: column;
     gap: 5px;
-  }
-  .signin .eyebrow {
-    font-size: 11px;
-  }
-  .signin h2 {
-    font-size: 29px;
   }
 }
 @media (max-width: 680px) {
@@ -1807,9 +1735,6 @@ kbd {
   .brand > svg {
     width: 30px;
     height: 30px;
-  }
-  .brand > span {
-    font-size: 30px;
   }
   .brand-caption,
   .workspace-label,
@@ -1832,7 +1757,6 @@ kbd {
     padding: 10px 2px 13px;
     gap: 8px;
     min-width: 100px;
-    font-size: 13px;
   }
   .tab[aria-current='page'] {
     background: none;
@@ -1854,7 +1778,6 @@ kbd {
   .signout {
     border: 0;
     padding: 9px 0 9px 12px;
-    font-size: 12px;
   }
   .workspace {
     margin-left: 0;
@@ -1866,11 +1789,9 @@ kbd {
     gap: 10px;
   }
   .breadcrumb {
-    font-size: 12px;
-    gap: 8px;
+    display: none;
   }
   .connection {
-    font-size: 11px;
     gap: 5px;
   }
   .page {
@@ -1880,11 +1801,9 @@ kbd {
     gap: 8px;
   }
   .eyebrow {
-    font-size: 11px;
     letter-spacing: 0.11em;
   }
   .section-index {
-    font-size: 11px;
     letter-spacing: 0.08em;
   }
   .ask {
@@ -1897,22 +1816,15 @@ kbd {
     position: relative;
     min-height: 0;
   }
-  .empty h1 {
-    font-size: clamp(34px, 7.5vw, 47px);
-  }
   .hero-copy > p {
-    max-width: 360px;
-    font-size: 13px;
     margin-top: 18px;
   }
   .hero-kicker {
     margin-bottom: 16px;
-    font-size: 12px;
   }
   .hero-proof {
     max-width: none;
     margin-top: 20px;
-    font-size: 11px;
     align-items: center;
   }
   .empty > .observatory {
@@ -1929,25 +1841,23 @@ kbd {
   .discovery-heading {
     margin-bottom: 12px;
   }
-  .discovery-heading h2 {
-    font-size: 12px;
+  .prompt-grid {
+    grid-template-columns: 1fr;
   }
   .prompt-card {
-    padding: 14px 11px;
+    display: block;
+    padding: 13px 14px;
   }
   .prompt-card-top {
-    margin-bottom: 17px;
+    float: left;
+    margin: 2px 12px 0 0;
   }
-  .prompt-card h3 {
-    font-size: 12px;
-    line-height: 1.4;
-  }
+  .prompt-card-top > span,
   .prompt-card h3 svg {
     display: none;
   }
   .prompt-card p {
-    font-size: 11px;
-    margin-top: 7px;
+    margin-top: 3px;
   }
   .composer {
     padding-top: 18px;
@@ -1957,18 +1867,12 @@ kbd {
     padding: 9px 9px 9px 12px;
     gap: 10px;
   }
-  .composer .field {
-    font-size: 14px;
-  }
   .composer-icon {
     width: 17px;
   }
   .ask-submit {
     width: 36px;
     height: 36px;
-  }
-  .composer-meta {
-    font-size: 11px;
   }
   .composer-meta > span:last-child {
     display: none;
@@ -1978,21 +1882,14 @@ kbd {
     gap: 9px;
     padding: 12px;
   }
-  .first-document strong {
-    font-size: 12px;
-  }
   .first-document > .text-button {
     margin-left: 27px;
     padding: 0;
   }
   .workspace-footer {
     margin: 0 22px;
-    font-size: 11px;
     padding: 13px 0;
     gap: 10px;
-  }
-  .workspace-footer > span:first-child {
-    font-size: 11px;
   }
   .footer-star {
     margin-left: 4px;
@@ -2003,20 +1900,8 @@ kbd {
   .thread-heading {
     margin-bottom: 25px;
   }
-  .thread-heading h1 {
-    font-size: 25px;
-  }
   .turn-question {
     padding: 14px 16px;
-  }
-  .turn h3 {
-    font-size: 16px;
-  }
-  .answer {
-    font-size: 17px;
-  }
-  .source summary {
-    font-size: 13px;
   }
   .source summary small {
     display: block;
@@ -2025,14 +1910,10 @@ kbd {
   .library-heading {
     padding: 28px 0 25px;
   }
-  .library h1 {
-    font-size: 33px;
-  }
   .library-heading-mark {
     display: none;
   }
   .lede {
-    font-size: 12px;
     max-width: 300px;
   }
   .library-stats {
@@ -2043,21 +1924,11 @@ kbd {
     padding-left: 14px;
   }
   .library-stats span {
-    font-size: 11px;
     gap: 4px;
     letter-spacing: 0.06em;
   }
-  .library-stats strong {
-    font-size: 28px;
-  }
   .dropzone {
     padding: 19px 15px;
-  }
-  .dropzone-text strong {
-    font-size: 12px;
-  }
-  .dropzone-text span {
-    font-size: 11px;
   }
   .doc {
     padding: 13px 11px;
@@ -2071,12 +1942,8 @@ kbd {
     flex-basis: calc(100% - 45px);
   }
   .doc-name {
-    font-size: 14px;
     white-space: normal;
     overflow-wrap: anywhere;
-  }
-  .doc-detail {
-    font-size: 12px;
   }
   .status {
     margin-left: 43px;
@@ -2084,9 +1951,6 @@ kbd {
   .delete {
     margin-left: auto;
     width: 36px;
-  }
-  .library-footnote {
-    font-size: 11px;
   }
   .signin {
     grid-template-columns: 1fr;
@@ -2101,12 +1965,10 @@ kbd {
     isolation: isolate;
   }
   .signin h1 {
-    font-size: 35px;
     margin-top: 14px;
   }
   .signin-description {
     margin-top: 15px;
-    font-size: 14px;
   }
   .signin-story .observatory {
     position: absolute;
@@ -2131,12 +1993,6 @@ kbd {
   .signin-icon {
     display: none;
   }
-  .signin h2 {
-    font-size: 28px;
-  }
-  .signin-tagline {
-    font-size: 14px;
-  }
   .signin-tagline br {
     display: none;
   }
@@ -2152,7 +2008,6 @@ kbd {
   }
   .signin-bottom {
     margin-top: 28px;
-    font-size: 11px;
   }
 }
 @media (max-width: 360px) {
@@ -2163,31 +2018,9 @@ kbd {
   .section-index {
     display: none;
   }
-  .empty h1 {
-    font-size: 31px;
-  }
-  .prompt-grid {
-    grid-template-columns: 1fr;
-  }
-  .prompt-card {
-    padding: 13px;
-  }
-  .prompt-card-top {
-    float: left;
-    margin: 1px 14px 0 0;
-  }
-  .prompt-card-top > span {
-    display: none;
-  }
-  .prompt-card h3 {
-    font-size: 12px;
-  }
-  .prompt-card p {
-    margin-top: 3px;
-  }
 }
 /* Laptop heights: tighten the hero so the composer doesn't sit over the starters. */
-@media (min-width: 681px) and (max-height: 820px) {
+@media (min-width: 681px) and (max-height: 899px) {
   .page {
     padding-top: 20px;
   }
@@ -2196,7 +2029,7 @@ kbd {
     padding: 12px 0 18px;
   }
   .empty > .observatory {
-    max-width: 250px;
+    max-width: max(200px, calc(100dvh - 470px));
   }
   .empty .orbital-caption,
   .hero-kicker {
@@ -2219,6 +2052,12 @@ kbd {
     padding-top: 14px;
   }
 }
+/* The promo card gives way before Sign out falls off the sidebar. */
+@media (min-width: 681px) and (max-width: 900px), (min-width: 681px) and (max-height: 850px) {
+  .sidebar-note {
+    display: none;
+  }
+}
 /* Too short to fit both: let the starters scroll instead of being covered. */
 @media (min-width: 681px) and (max-height: 660px) {
   .discovery ~ .composer {
@@ -2239,14 +2078,8 @@ kbd {
     transform: none;
   }
 }
-/* Keep mobile form controls legible and prevent focus zoom on iOS. */
+/* Let the library controls and sign-in note wrap on phones. */
 @media (max-width: 680px) {
-  .composer .field,
-  .signin .field,
-  .search-field input,
-  .library-controls select {
-    font-size: 16px;
-  }
   .library-controls {
     flex-wrap: wrap;
   }

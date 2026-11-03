@@ -431,7 +431,27 @@ async function noOverflow(page, label) {
         }),
         `${width}x${height}: the composer does not cover the starters`,
       );
+      check(
+        height <= 600 ||
+          (await page.locator('.sidebar').evaluate((el) => el.scrollHeight <= el.clientHeight)),
+        `${width}x${height}: the sidebar fits without scrolling`,
+      );
     }
+    const typeAt = async (width) => {
+      await page.setViewportSize({ width, height: 1000 });
+      return page.evaluate(() =>
+        ['body', '.hero-copy > p', '.prompt-card h3', '.prompt-card p'].map((s) => getComputedStyle(document.querySelector(s)).fontSize).join(),
+      );
+    };
+    check((await typeAt(1440)) === (await typeAt(1920)), 'text does not change size on wider screens');
+    check((await typeAt(1440)).startsWith('16px'), 'body text is 16px at the browser default');
+    await page.evaluate(() => {
+      document.documentElement.style.fontSize = '20px';
+    });
+    check((await typeAt(1440)).startsWith('20px'), 'text follows the browser font size');
+    await page.evaluate(() => {
+      document.documentElement.style.fontSize = '';
+    });
 
     for (const width of [1440, 1024, 768, 390, 320]) {
       await page.setViewportSize({ width, height: width < 500 ? 844 : 1000 });
