@@ -228,6 +228,7 @@ function Ask({ readyCount, loading, onOpenLibrary }) {
         backend: data.forge_backend,
       };
     } catch (error) {
+      setInput((typed) => typed || question); // ready to ask again, unless they've moved on
       done = {
         question,
         answer: error.detail

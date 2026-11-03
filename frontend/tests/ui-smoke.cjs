@@ -224,6 +224,10 @@ async function noOverflow(page, label) {
     await page.getByRole('textbox', { name: 'Your question' }).fill('One more question');
     await page.getByRole('textbox', { name: 'Your question' }).press('Enter');
     await visible(page, 'Query rate limit exceeded. Try again in 3s.');
+    check(
+      (await page.getByRole('textbox', { name: 'Your question' }).inputValue()) === 'One more question',
+      'a failed question stays in the box to ask again',
+    );
     askError = false;
     await page.getByRole('textbox', { name: 'Your question' }).fill('Please explain the policy.');
     await page.getByRole('textbox', { name: 'Your question' }).press('Enter');
