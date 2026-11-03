@@ -181,7 +181,7 @@ function Turn({ turn }) {
   );
 }
 
-function Ask({ readyCount, loading, onOpenLibrary }) {
+function Ask({ readyCount, loading, loaded, onOpenLibrary }) {
   const [turns, setTurns] = useState([]);
   const [input, setInput] = useState('');
   const threadRef = useRef(null);
@@ -320,7 +320,7 @@ function Ask({ readyCount, loading, onOpenLibrary }) {
       )}
 
       <div className="composer">
-        {!readyCount && !loading && (
+        {!readyCount && loaded && (
           <div className="first-document">
             <BookOpen size={18} />
             <div>
@@ -344,9 +344,11 @@ function Ask({ readyCount, loading, onOpenLibrary }) {
             placeholder={
               loading
                 ? 'Connecting to your library…'
-                : readyCount
-                  ? 'Ask your documents…'
-                  : 'Add a PDF to your library first'
+                : !loaded
+                  ? 'Your library isn’t available right now'
+                  : readyCount
+                    ? 'Ask your documents…'
+                    : 'Add a PDF to your library first'
             }
             disabled={readyCount === 0 || loading}
           />

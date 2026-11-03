@@ -16,12 +16,16 @@ function App() {
   const [documents, setDocuments] = useState([]);
   const [apiUp, setApiUp] = useState(true);
   const [loading, setLoading] = useState(true);
+  // Until a read succeeds the list is unknown, not empty: an outage on load
+  // mustn't tell someone their library has nothing in it.
+  const [loaded, setLoaded] = useState(false);
 
   const signOut = useCallback(() => {
     clearKey();
     setSignedIn(false);
     setDocuments([]);
     setLoading(true);
+    setLoaded(false);
   }, []);
 
   useEffect(() => setUnauthorizedHandler(signOut), [signOut]);
@@ -30,6 +34,7 @@ function App() {
     try {
       setDocuments(await api('/documents'));
       setApiUp(true);
+      setLoaded(true);
     } catch (error) {
       if (error.status !== 401) setApiUp(false);
     } finally {
@@ -90,7 +95,7 @@ function App() {
               <Icon size={18} />
               <span>{label}</span>
               {id === 'library' ? (
-                <span className="nav-count">{documents.length}</span>
+                loaded && <span className="nav-count">{documents.length}</span>
               ) : (
                 <ChevronRight size={15} className="nav-arrow" />
               )}
@@ -146,10 +151,10 @@ function App() {
             </div>
           )}
           <div hidden={view !== 'ask'}>
-            <Ask readyCount={ready} loading={loading} onOpenLibrary={() => setView('library')} />
+            <Ask readyCount={ready} loading={loading} loaded={loaded} onOpenLibrary={() => setView('library')} />
           </div>
           <div hidden={view !== 'library'}>
-            <Library documents={documents} onChange={loadDocuments} loading={loading} />
+            <Library documents={documents} onChange={loadDocuments} loading={loading} loaded={loaded} />
           </div>
         </main>
         <footer className="workspace-footer">

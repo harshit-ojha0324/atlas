@@ -318,6 +318,23 @@ async function noOverflow(page, label) {
     await page.getByRole('button', { name: 'Retry', exact: true }).click();
     await visible(page, '2 documents ready');
     check((await page.locator('.connection-notice').count()) === 0, 'retry recovers an unavailable library');
+    listError = true;
+    await page.reload();
+    await visible(page, 'Atlas isn’t reachable');
+    check((await page.locator('.first-document').count()) === 0, 'an outage on load does not ask for a first PDF');
+    check(await page.getByRole('textbox', { name: 'Your question' }).isDisabled(), 'an outage on load disables asking');
+    await page.getByRole('navigation').getByRole('button', { name: /Library/ }).click();
+    await visible(page, 'Your documents couldn’t be loaded.');
+    check(
+      (await page.getByText('A blank page. Endless potential.').count()) === 0 &&
+        (await page.locator('.library-stats strong').first().textContent()) === '—',
+      'an outage on load does not claim the library is empty',
+    );
+    listError = false;
+    await page.getByRole('button', { name: 'Retry', exact: true }).click();
+    await visible(page, '2 documents ready');
+    check((await page.locator('.doc').count()) === 3, 'retry after an outage on load lists the documents');
+    await page.getByRole('navigation').getByRole('button', { name: 'Ask Atlas' }).click();
     await page.getByRole('button', { name: 'Sign out', exact: true }).click();
     check(
       (await page.evaluate(() => sessionStorage.getItem('atlas.apiKey'))) === null,

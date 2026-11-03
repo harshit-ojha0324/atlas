@@ -1,5 +1,5 @@
 import { useRef, useState } from 'react';
-import { Upload, Trash2, Loader, FileText, Search, BookOpen, Check, X } from 'lucide-react';
+import { Upload, Trash2, Loader, FileText, Search, BookOpen, Check, CloudOff, X } from 'lucide-react';
 import api from '../services/api';
 
 const MAX_BYTES = 10 * 1024 * 1024; // the API's upload limit
@@ -17,7 +17,7 @@ function detail(doc) {
   return 'Reading and indexing';
 }
 
-function Library({ documents, onChange, loading }) {
+function Library({ documents, onChange, loading, loaded }) {
   const [uploading, setUploading] = useState(false);
   const [notice, setNotice] = useState(null);
   const [dragActive, setDragActive] = useState(false);
@@ -117,21 +117,21 @@ function Library({ documents, onChange, loading }) {
       <div className="library-stats">
         <div>
           <span>DOCUMENTS</span>
-          <strong>{loading ? '—' : String(documents.length).padStart(2, '0')}</strong>
+          <strong>{loaded ? String(documents.length).padStart(2, '0') : '—'}</strong>
         </div>
         <div>
           <span>
             <i className="stat-dot ready" />
             READY TO EXPLORE
           </span>
-          <strong>{loading ? '—' : String(ready).padStart(2, '0')}</strong>
+          <strong>{loaded ? String(ready).padStart(2, '0') : '—'}</strong>
         </div>
         <div>
           <span>
             <i className="stat-dot pending" />
             PROCESSING
           </span>
-          <strong>{loading ? '—' : String(pending).padStart(2, '0')}</strong>
+          <strong>{loaded ? String(pending).padStart(2, '0') : '—'}</strong>
         </div>
       </div>
 
@@ -188,7 +188,7 @@ function Library({ documents, onChange, loading }) {
 
       <div className="library-toolbar">
         <h2>
-          Your documents <span>{documents.length}</span>
+          Your documents {loaded && <span>{documents.length}</span>}
         </h2>
         <div className="library-controls">
           <div className="search-field">
@@ -213,6 +213,12 @@ function Library({ documents, onChange, loading }) {
           <div className="skeleton" />
           <div className="skeleton" />
           <div className="skeleton" />
+        </div>
+      ) : !loaded ? (
+        <div className="doc-empty">
+          <CloudOff size={28} strokeWidth={1.3} />
+          <h3>Your documents couldn’t be loaded.</h3>
+          <p>Atlas isn’t reachable, so nothing can be listed yet. Use Retry at the top of the page.</p>
         </div>
       ) : documents.length === 0 ? (
         <div className="doc-empty">
