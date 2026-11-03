@@ -240,6 +240,19 @@ function Ask({ readyCount, loading, loaded, onOpenLibrary }) {
     setTurns((prev) => [...prev.slice(0, -1), done]);
   };
 
+  const firstDocument = !readyCount && loaded && (
+    <div className="first-document">
+      <BookOpen size={18} />
+      <div>
+        <strong>A great answer starts with a source.</strong>
+        <span>Add your first PDF to begin exploring.</span>
+      </div>
+      <button className="text-button" onClick={onOpenLibrary}>
+        Open library <ArrowRight size={16} />
+      </button>
+    </div>
+  );
+
   return (
     <div className="ask">
       <div className="section-topline">
@@ -271,39 +284,41 @@ function Ask({ readyCount, loading, loaded, onOpenLibrary }) {
             </div>
             <Observatory />
           </section>
-          <section className="discovery" aria-labelledby="discovery-title">
-            <div className="discovery-heading">
-              <h2 id="discovery-title">Where will your curiosity take you?</h2>
-              <span>START WITH A QUESTION</span>
-            </div>
-            <div className="prompt-grid">
-              {STARTERS.map(([Icon, title, description, starter], i) => (
-                <button
-                  className="prompt-card"
-                  key={title}
-                  disabled={!readyCount || loading}
-                  onClick={() => {
-                    setInput(starter);
-                    // after the input re-renders: focus it with the cursor at the end
-                    requestAnimationFrame(() => {
-                      inputRef.current?.focus();
-                      inputRef.current?.setSelectionRange(starter.length, starter.length);
-                    });
-                  }}
-                >
-                  <div className="prompt-card-top">
-                    <Icon size={19} />
-                    <span>0{i + 1}</span>
-                  </div>
-                  <h3>
-                    {title}
-                    <ArrowUpRight size={16} />
-                  </h3>
-                  <p>{description}</p>
-                </button>
-              ))}
-            </div>
-          </section>
+          {firstDocument || (
+            <section className="discovery" aria-labelledby="discovery-title">
+              <div className="discovery-heading">
+                <h2 id="discovery-title">Where will your curiosity take you?</h2>
+                <span>START WITH A QUESTION</span>
+              </div>
+              <div className="prompt-grid">
+                {STARTERS.map(([Icon, title, description, starter], i) => (
+                  <button
+                    className="prompt-card"
+                    key={title}
+                    disabled={!readyCount || loading}
+                    onClick={() => {
+                      setInput(starter);
+                      // after the input re-renders: focus it with the cursor at the end
+                      requestAnimationFrame(() => {
+                        inputRef.current?.focus();
+                        inputRef.current?.setSelectionRange(starter.length, starter.length);
+                      });
+                    }}
+                  >
+                    <div className="prompt-card-top">
+                      <Icon size={19} />
+                      <span>0{i + 1}</span>
+                    </div>
+                    <h3>
+                      {title}
+                      <ArrowUpRight size={16} />
+                    </h3>
+                    <p>{description}</p>
+                  </button>
+                ))}
+              </div>
+            </section>
+          )}
         </>
       ) : (
         <div className="thread" aria-busy={busy} ref={threadRef}>
@@ -320,18 +335,7 @@ function Ask({ readyCount, loading, loaded, onOpenLibrary }) {
       )}
 
       <div className="composer">
-        {!readyCount && loaded && (
-          <div className="first-document">
-            <BookOpen size={18} />
-            <div>
-              <strong>A great answer starts with a source.</strong>
-              <span>Add your first PDF to begin exploring.</span>
-            </div>
-            <button className="text-button" onClick={onOpenLibrary}>
-              Open library <ArrowRight size={16} />
-            </button>
-          </div>
-        )}
+        {turns.length > 0 && firstDocument}
         <form onSubmit={handleSubmit}>
           <Sparkles size={20} className="composer-icon" />
           <input

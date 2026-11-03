@@ -355,6 +355,18 @@ async function noOverflow(page, label) {
     await page.getByRole('navigation').getByRole('button', { name: 'Ask Atlas' }).click();
     await visible(page, '2 documents ready');
 
+    for (const [width, height] of [[1920, 1080], [1440, 900], [1366, 768], [1280, 720], [1000, 700], [1280, 600]]) {
+      await page.setViewportSize({ width, height });
+      check(
+        await page.evaluate(() => {
+          const cards = document.querySelector('.prompt-grid').getBoundingClientRect();
+          const composer = document.querySelector('.composer form').getBoundingClientRect();
+          return cards.bottom <= composer.top;
+        }),
+        `${width}x${height}: the composer does not cover the starters`,
+      );
+    }
+
     for (const width of [1440, 1024, 768, 390, 320]) {
       await page.setViewportSize({ width, height: width < 500 ? 844 : 1000 });
       await noOverflow(page, `${width}px Ask`);

@@ -2178,6 +2178,45 @@ kbd {
     margin-top: 3px;
   }
 }
+/* Laptop heights: tighten the hero so the composer doesn't sit over the starters. */
+@media (min-width: 681px) and (max-height: 820px) {
+  .page {
+    padding-top: 20px;
+  }
+  .empty {
+    min-height: 0;
+    padding: 12px 0 18px;
+  }
+  .empty > .observatory {
+    max-width: 250px;
+  }
+  .empty .orbital-caption,
+  .hero-kicker {
+    display: none;
+  }
+  .hero-copy > p {
+    line-height: 1.7;
+    margin-top: 14px;
+  }
+  .hero-proof {
+    margin-top: 14px;
+  }
+  .prompt-card {
+    padding: 14px 18px;
+  }
+  .prompt-card-top {
+    margin-bottom: 10px;
+  }
+  .composer {
+    padding-top: 14px;
+  }
+}
+/* Too short to fit both: let the starters scroll instead of being covered. */
+@media (min-width: 681px) and (max-height: 660px) {
+  .discovery ~ .composer {
+    position: static;
+  }
+}
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
