@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react';
+import { Fragment, useState, useRef, useEffect } from 'react';
 import {
   ArrowRight,
   ArrowUp,
@@ -26,21 +26,28 @@ const EXCERPT_CHARS = 200;
 // Models answer in Markdown by habit. Render the little they use (paragraphs,
 // headings, bulleted and numbered lists, **bold**, *italic*) as React elements,
 // never as HTML, so an answer can't inject markup. Code ticks are dropped:
-// answers are prose.
-function inline(text) {
+// answers are prose. Citations like [1] or [1, 2] go to `cite`.
+const CITATION = /\[\d{1,2}(?:,\s*\d{1,2})*\]/;
+const INLINE = new RegExp(`(\\*\\*[^*]+\\*\\*|\\*[^*\\n]+\\*|${CITATION.source})`);
+
+function inline(text, cite) {
   return text
     .replace(/`/g, '')
-    .split(/(\*\*[^*]+\*\*|\*[^*\n]+\*)/)
+    .split(INLINE)
     .map((part, i) => {
       if (part.startsWith('**') && part.endsWith('**') && part.length > 4)
-        return <strong key={i}>{part.slice(2, -2)}</strong>;
+        return <strong key={i}>{inline(part.slice(2, -2), cite)}</strong>;
       if (part.startsWith('*') && part.endsWith('*') && part.length > 2)
-        return <em key={i}>{part.slice(1, -1)}</em>;
+        return <em key={i}>{inline(part.slice(1, -1), cite)}</em>;
+      if (CITATION.test(part)) return <Fragment key={i}>{cite(part)}</Fragment>;
       return part;
     });
 }
 
-function Prose({ text }) {
+const scrollBehavior = () =>
+  window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'instant' : 'smooth';
+
+function Prose({ text, cite }) {
   const blocks = [];
   for (const line of text.split('\n')) {
     const heading = line.match(/^\s*#{1,6}\s+(.*)/);
@@ -64,11 +71,11 @@ function Prose({ text }) {
     }
   }
   return blocks.map((b, i) => {
-    const items = b.lines?.map((l, j) => <li key={j}>{inline(l)}</li>);
-    if (b.type === 'h') return <h4 key={i}>{inline(b.lines[0])}</h4>;
+    const items = b.lines?.map((l, j) => <li key={j}>{inline(l, cite)}</li>);
+    if (b.type === 'h') return <h4 key={i}>{inline(b.lines[0], cite)}</h4>;
     if (b.type === 'ul') return <ul key={i}>{items}</ul>;
     if (b.type === 'ol') return <ol key={i} start={b.start}>{items}</ol>;
-    return b.type === 'p' ? <p key={i}>{inline(b.lines.join(' '))}</p> : null;
+    return b.type === 'p' ? <p key={i}>{inline(b.lines.join(' '), cite)}</p> : null;
   });
 }
 
@@ -104,6 +111,45 @@ const STARTERS = [
 ];
 
 function Turn({ turn }) {
+  const [followed, setFollowed] = useState(null); // the citation last followed: { n, from }
+  const sourcesRef = useRef(null);
+
+  const follow = (n, from) => {
+    const source = sourcesRef.current.querySelectorAll('details')[n - 1];
+    source.open = true;
+    source.querySelector('summary').focus({ preventScroll: true });
+    source.scrollIntoView({ behavior: scrollBehavior(), block: 'center' });
+    setFollowed({ n, from });
+  };
+
+  const goBack = () => {
+    followed.from.focus({ preventScroll: true });
+    followed.from.scrollIntoView({ behavior: scrollBehavior(), block: 'center' });
+    setFollowed(null);
+  };
+
+  // ponytail: a number copied from a document's own text links too if it's in
+  // range; only structured citations from the API could tell them apart.
+  const cite = (marker) => {
+    const numbers = marker.match(/\d+/g).map(Number);
+    if (!numbers.every((n) => turn.sources?.[n - 1])) return marker;
+    return numbers.map((n) => {
+      const { document, page } = turn.sources[n - 1];
+      return (
+        <button
+          key={n}
+          type="button"
+          className={followed?.n === n ? 'cite active' : 'cite'}
+          aria-label={`Source ${n}: ${document}, page ${page}`}
+          title={`${document}, page ${page}`}
+          onClick={(e) => follow(n, e.currentTarget)}
+        >
+          {n}
+        </button>
+      );
+    });
+  };
+
   return (
     <article className="turn">
       <div className="turn-question">
@@ -133,7 +179,7 @@ function Turn({ turn }) {
             </p>
           ) : (
             <div className="answer">
-              <Prose text={turn.answer} />
+              <Prose text={turn.answer} cite={cite} />
             </div>
           )}
 
@@ -146,16 +192,16 @@ function Turn({ turn }) {
           )}
 
           {turn.sources?.length > 0 && (
-            <div className="sources">
+            <div className="sources" ref={sourcesRef}>
               <p className="sources-heading">
                 <BookOpen size={14} /> Sources <span>{turn.sources.length}</span>
               </p>
               <ol>
                 {turn.sources.map((s, i) => (
                   <li key={i}>
-                    <details className="source">
+                    <details className={followed?.n === i + 1 ? 'source active' : 'source'}>
                       <summary>
-                        <b>{String(i + 1).padStart(2, '0')}</b>
+                        <b>{i + 1}</b>
                         <span>
                           {s.document}
                           <small>Page {s.page}</small>
@@ -166,6 +212,11 @@ function Turn({ turn }) {
                         {s.excerpt}
                         {s.excerpt.length >= EXCERPT_CHARS && '…'}
                       </p>
+                      {followed?.n === i + 1 && (
+                        <button type="button" className="text-button source-back" onClick={goBack}>
+                          <ArrowUp size={15} /> Back to the answer
+                        </button>
+                      )}
                     </details>
                   </li>
                 ))}
@@ -196,10 +247,7 @@ function Ask({ readyCount, loading, loaded, onOpenLibrary }) {
 
   // Bring the newest question to the top, so a long answer is read from its start.
   useEffect(() => {
-    threadRef.current?.lastElementChild?.scrollIntoView({
-      behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'instant' : 'smooth',
-      block: 'start',
-    });
+    threadRef.current?.lastElementChild?.scrollIntoView({ behavior: scrollBehavior(), block: 'start' });
   }, [turns]);
 
   const handleSubmit = async (e) => {
@@ -252,7 +300,7 @@ function Ask({ readyCount, loading, loaded, onOpenLibrary }) {
     ? ''
     : last.pending
       ? 'Reading your documents…'
-      : `Answer ready. ${last.answer.replace(/[*`#]/g, '')}`;
+      : `Answer ready. ${last.answer.replace(new RegExp(`\\s*${CITATION.source}`, 'g'), '').replace(/[*`#]/g, '')}`;
 
   const firstDocument = !readyCount && loaded && (
     <div className="first-document">

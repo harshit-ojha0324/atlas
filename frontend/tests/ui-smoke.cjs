@@ -275,6 +275,52 @@ async function noOverflow(page, label) {
       'HTML in an answer stays plain text',
     );
 
+    nextAnswer = {
+      ...answer,
+      answer: 'Leave is **25 days [1]**. Both sources agree [1, 2]. Not citations: 2026 [2026] and [9].',
+      sources: [
+        answer.sources[0],
+        { document: 'Research notes.pdf', page: 2, excerpt: 'The carry-over policy applies after one year.' },
+      ],
+    };
+    await page.getByRole('textbox', { name: 'Your question' }).fill('How much leave?');
+    await page.getByRole('textbox', { name: 'Your question' }).press('Enter');
+    await page.locator('.answered-by').nth(5).waitFor();
+    nextAnswer = null;
+    const cited = page.locator('.turn').last();
+    check(
+      (await cited.locator('.cite').count()) === 3 &&
+        (await cited.locator('.answer').innerText()).includes('[2026] and [9]'),
+      'citations become links, and numbers that match no source stay text',
+    );
+    check(
+      await page.locator('.ask > [role="status"]').evaluate((el) => !/\[\d/.test(el.textContent.replace('[2026]', ''))),
+      'citation markers are not read out with the answer',
+    );
+    const toSource2 = cited.getByRole('button', { name: 'Source 2: Research notes.pdf, page 2' });
+    await toSource2.click();
+    const source2 = cited.locator('details').nth(1);
+    check(await source2.evaluate((el) => el.open), 'a citation opens its source');
+    check(await cited.locator('details').first().evaluate((el) => !el.open), 'a citation opens only its source');
+    check(
+      await source2.locator('summary').evaluate((el) => el === document.activeElement),
+      'a citation moves focus to its source',
+    );
+    check(
+      await source2.evaluate((el) => {
+        const { top, bottom } = el.getBoundingClientRect();
+        return top >= 0 && bottom <= document.querySelector('.composer form').getBoundingClientRect().top;
+      }),
+      'the opened source is on screen, clear of the composer',
+    );
+    await visible(page, 'The carry-over policy applies after one year.');
+    await cited.getByRole('button', { name: 'Back to the answer' }).click();
+    check(
+      await toSource2.evaluate((el) => el === document.activeElement),
+      'Back to the answer returns to the citation',
+    );
+    check((await cited.getByRole('button', { name: 'Back to the answer' }).count()) === 0, 'the way back goes once used');
+
     await page
       .getByRole('navigation')
       .getByRole('link', { name: /Library/ })
