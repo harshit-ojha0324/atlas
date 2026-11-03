@@ -323,6 +323,10 @@ async function noOverflow(page, label) {
     await visible(page, 'Atlas isn’t reachable');
     check((await page.locator('.first-document').count()) === 0, 'an outage on load does not ask for a first PDF');
     check(await page.getByRole('textbox', { name: 'Your question' }).isDisabled(), 'an outage on load disables asking');
+    check(
+      (await page.locator('.prompt-card').first().evaluate((el) => el.disabled && +getComputedStyle(el).opacity < 1)),
+      'disabled starter cards look disabled',
+    );
     await page.getByRole('navigation').getByRole('button', { name: /Library/ }).click();
     await visible(page, 'Your documents couldn’t be loaded.');
     check(
