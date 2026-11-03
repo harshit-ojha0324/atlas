@@ -91,7 +91,7 @@ All endpoints except health checks require an `X-API-Key` header.
 | `GET /documents` | All of the tenant's documents. |
 | `DELETE /documents/{id}` | Delete a document and its chunks. |
 | `POST /search` | `{query, k}`: the `k` nearest passages (default 4, max 20) with document, page and similarity score. |
-| `POST /ask` | `{question, history?, k?}`: an answer with cited sources. With `history`, the question is treated as a follow-up. The response includes `security_warnings` and `forge_backend` (the model that answered, or `cache`). |
+| `POST /ask` | `{question, history?, k?}`: an answer with cited sources: a citation like `[1]` is the first entry in `sources`. With `history`, the question is treated as a follow-up. The response includes `security_warnings` and `forge_backend` (the model that answered, or `cache`). |
 | `GET /healthz`, `/readyz`, `/metrics` | Liveness, readiness (Postgres and Redis), Prometheus metrics. |
 
 Rate-limited responses return `429` with `Retry-After`.

@@ -80,10 +80,11 @@ async def search_documents(query: str, k: int = 4) -> dict:
 
 @mcp.tool(annotations=ToolAnnotations(title="Ask the documents", readOnlyHint=True, openWorldHint=True))
 async def ask(question: str) -> dict:
-    """Answer a question from this tenant's documents, with page citations.
+    """Answer a question from this tenant's documents, with numbered citations.
 
     Ask a standalone question (name the subject; don't rely on earlier turns).
-    Returns the answer, its sources, and any security warnings (PII redacted,
+    Returns the answer, whose citations like [1] number into its list of
+    sources, and any security warnings (PII redacted,
     passages withheld). Questions that look like prompt injections are refused;
     if nothing in the documents is relevant, the answer says so.
     """

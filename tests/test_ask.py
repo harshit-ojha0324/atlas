@@ -4,6 +4,9 @@ import httpx
 import pytest
 from helpers import ZEBRA
 
+from app.core.answer import RAG_PROMPT, format_context
+from app.core.retrieval import Hit
+
 ALPHA = "Alpha budget report for the river restoration project."
 PENGUIN = "Penguin colonies nest on the Antarctic coast through the winter."
 
@@ -31,8 +34,17 @@ async def test_answers_as_the_tenant_from_only_its_documents(env, forge):
     assert call["subtenant"] == str(env.ids["a"])
     assert call["temperature"] == 0 and call["model"] == "forge-default"
     prompt = call["messages"][0]["content"]
-    assert "[alpha.pdf, page 1]\n" + ALPHA in prompt
+    assert "[1] alpha.pdf, page 1\n" + ALPHA in prompt
     assert "Serengeti" not in prompt  # B's chunk never reaches A's prompt
+
+
+def test_passages_are_numbered_in_source_order():
+    hits = [
+        Hit(document_id=1, document="alpha.pdf", page=4, text=ALPHA, score=0.9),
+        Hit(document_id=2, document="zebra.pdf", page=2, text=ZEBRA, score=0.8),
+    ]
+    assert format_context(hits) == f"[1] alpha.pdf, page 4\n{ALPHA}\n\n[2] zebra.pdf, page 2\n{ZEBRA}"
+    assert "cite the numbered passage" in RAG_PROMPT
 
 
 async def test_follow_up_is_rewritten_then_used_for_retrieval(env, forge):
