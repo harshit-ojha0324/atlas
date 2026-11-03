@@ -203,7 +203,7 @@ async function noOverflow(page, label) {
     await page.screenshot({ path: `${output}/answer-desktop.png`, fullPage: true });
     await page
       .getByRole('navigation', { name: 'Sections' })
-      .getByRole('button', { name: /Library/ })
+      .getByRole('link', { name: /Library/ })
       .click();
     await visible(page, 'No readable text found.');
     await page.screenshot({ path: `${output}/library-desktop.png`, fullPage: true });
@@ -216,7 +216,7 @@ async function noOverflow(page, label) {
     await page.getByLabel('Filter by status').selectOption('failed');
     check((await page.locator('.doc').count()) === 1, 'status filter finds failed document');
     await page.getByLabel('Filter by status').selectOption('all');
-    await page.getByRole('navigation').getByRole('button', { name: 'Ask Atlas' }).click();
+    await page.getByRole('navigation').getByRole('link', { name: 'Ask Atlas' }).click();
     await visible(page, 'Answered by Gemini');
     check((await page.locator('.turn').count()) === 1, 'conversation survives switching sections');
     await page.getByRole('textbox', { name: 'Your question' }).fill('And for contractors?');
@@ -261,7 +261,7 @@ async function noOverflow(page, label) {
 
     await page
       .getByRole('navigation')
-      .getByRole('button', { name: /Library/ })
+      .getByRole('link', { name: /Library/ })
       .click();
     const file = page.locator('input[type="file"]');
     await file.setInputFiles({ name: 'notes.txt', mimeType: 'text/plain', buffer: Buffer.from('not a PDF') });
@@ -320,7 +320,7 @@ async function noOverflow(page, label) {
     documents = structuredClone(initialDocuments);
 
     listError = true;
-    await page.getByRole('navigation').getByRole('button', { name: 'Ask Atlas' }).click();
+    await page.getByRole('navigation').getByRole('link', { name: 'Ask Atlas' }).click();
     await visible(page, 'Atlas isn’t reachable');
     listError = false;
     await page.getByRole('button', { name: 'Retry', exact: true }).click();
@@ -335,7 +335,7 @@ async function noOverflow(page, label) {
       (await page.locator('.prompt-card').first().evaluate((el) => el.disabled && +getComputedStyle(el).opacity < 1)),
       'disabled starter cards look disabled',
     );
-    await page.getByRole('navigation').getByRole('button', { name: /Library/ }).click();
+    await page.getByRole('navigation').getByRole('link', { name: /Library/ }).click();
     await visible(page, 'Your documents couldn’t be loaded.');
     check(
       (await page.getByText('A blank page. Endless potential.').count()) === 0 &&
@@ -346,7 +346,45 @@ async function noOverflow(page, label) {
     await page.getByRole('button', { name: 'Retry', exact: true }).click();
     await visible(page, '2 documents ready');
     check((await page.locator('.doc').count()) === 3, 'retry after an outage on load lists the documents');
-    await page.getByRole('navigation').getByRole('button', { name: 'Ask Atlas' }).click();
+    await page.getByRole('navigation').getByRole('link', { name: 'Ask Atlas' }).click();
+
+    const currentView = () => page.locator('.tab[aria-current="page"]').textContent();
+    const onView = (name) => page.locator('.tab[aria-current="page"]', { hasText: name }).waitFor();
+    const scrollY = () => page.evaluate(() => window.scrollY);
+    await page.setViewportSize({ width: 1000, height: 500 });
+    await page.getByRole('navigation').getByRole('link', { name: /Library/ }).click();
+    await page.waitForURL('**/#/library');
+    await onView('Library');
+    check(
+      await page.waitForFunction(() => document.title === 'Library | Atlas', null, { timeout: 2000 }).then(() => true, () => false),
+      'the title names the current view',
+    );
+    check(
+      await page.evaluate(() => document.activeElement.id === 'main-content'),
+      'changing view moves focus to the content',
+    );
+    await page.evaluate(() => window.scrollTo(0, 300));
+    await page.goBack();
+    await page.waitForURL('**/#/ask');
+    await onView('Ask Atlas');
+    check((await currentView()) === 'Ask Atlas', 'Back returns to the previous view');
+    check((await scrollY()) === 0, 'a view does not inherit the scroll of the last one');
+    await page.goForward();
+    await page.waitForURL('**/#/library');
+    await onView('Library');
+    check((await scrollY()) === 300, 'a view keeps its own scroll position');
+    await page.evaluate(() => {
+      window.location.hash = '#main-content';
+    });
+    await page.waitForTimeout(100); // long enough for hashchange to fire
+    check((await currentView()).startsWith('Library'), 'the skip link does not change the view');
+    await page.goBack();
+    await page.waitForURL('**/#/library');
+    await page.reload();
+    await visible(page, '2 documents ready');
+    check((await currentView()).startsWith('Library'), 'a reload stays on the current view');
+    await page.setViewportSize({ width: 1440, height: 1000 });
+    await page.getByRole('navigation').getByRole('link', { name: 'Ask Atlas' }).click();
     await page.getByRole('button', { name: 'Sign out', exact: true }).click();
     check(
       (await page.evaluate(() => sessionStorage.getItem('atlas.apiKey'))) === null,
@@ -364,7 +402,7 @@ async function noOverflow(page, label) {
     await page.getByRole('button', { name: 'Open library', exact: true }).click();
     await visible(page, 'A blank page. Endless potential.');
     documents = structuredClone(initialDocuments);
-    await page.getByRole('navigation').getByRole('button', { name: 'Ask Atlas' }).click();
+    await page.getByRole('navigation').getByRole('link', { name: 'Ask Atlas' }).click();
     await visible(page, '2 documents ready');
 
     for (const [width, height] of [[1920, 1080], [1440, 900], [1366, 768], [1280, 720], [1000, 700], [1280, 600]]) {
@@ -385,11 +423,11 @@ async function noOverflow(page, label) {
       if (width === 390) await page.screenshot({ path: `${output}/ask-mobile.png`, fullPage: true });
       await page
         .getByRole('navigation')
-        .getByRole('button', { name: /Library/ })
+        .getByRole('link', { name: /Library/ })
         .click();
       await noOverflow(page, `${width}px Library`);
       if (width === 390) await page.screenshot({ path: `${output}/library-mobile.png`, fullPage: true });
-      await page.getByRole('navigation').getByRole('button', { name: 'Ask Atlas' }).click();
+      await page.getByRole('navigation').getByRole('link', { name: 'Ask Atlas' }).click();
     }
     await page.getByRole('button', { name: 'Sign out', exact: true }).click();
     for (const width of [1440, 768, 390, 320]) {
@@ -403,7 +441,7 @@ async function noOverflow(page, label) {
     await page.evaluate(() => sessionStorage.setItem('atlas.apiKey', 'expired_fixture_key'));
     await page
       .getByRole('navigation')
-      .getByRole('button', { name: /Library/ })
+      .getByRole('link', { name: /Library/ })
       .click();
     await visible(page, 'Welcome to Atlas.');
     check(

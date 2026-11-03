@@ -330,6 +330,7 @@ h1 em,
   background: transparent;
   color: var(--muted);
   font-size: 13px;
+  text-decoration: none;
 }
 .tab:hover {
   color: var(--ink);

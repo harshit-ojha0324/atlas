@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useLayoutEffect, useCallback, useRef } from 'react';
 import { ArrowUpRight, BookOpen, ChevronRight, Compass, LogOut, ShieldCheck } from 'lucide-react';
 import Ask from './components/Ask';
 import Library from './components/Library';
@@ -10,9 +10,15 @@ import api, { getKey, clearKey, setUnauthorizedHandler } from './services/api';
 // statuses change on screen as the worker finishes them.
 const POLL_MS = 1500;
 
+// Views live in the URL hash: the API serves the UI as static files, so a path
+// wouldn't survive a reload. Other hashes (the skip link's) leave the view alone.
+const VIEWS = { '': 'ask', '#/ask': 'ask', '#/library': 'library' };
+const TITLES = { ask: 'Ask Atlas', library: 'Library | Atlas' };
+
 function App() {
   const [signedIn, setSignedIn] = useState(Boolean(getKey()));
-  const [view, setView] = useState('ask');
+  const [view, setView] = useState(VIEWS[window.location.hash] ?? 'ask');
+  const scrollTops = useRef({});
   const [documents, setDocuments] = useState([]);
   const [apiUp, setApiUp] = useState(true);
   const [loading, setLoading] = useState(true);
@@ -29,6 +35,28 @@ function App() {
   }, []);
 
   useEffect(() => setUnauthorizedHandler(signOut), [signOut]);
+
+  // Each view keeps its own scroll position, on Back as well as from the nav.
+  useEffect(() => {
+    window.history.scrollRestoration = 'manual';
+    const onHashChange = () => {
+      const next = VIEWS[window.location.hash];
+      if (!next || next === view) return;
+      scrollTops.current[view] = window.scrollY;
+      setView(next);
+      document.getElementById('main-content')?.focus({ preventScroll: true });
+    };
+    window.addEventListener('hashchange', onHashChange);
+    return () => window.removeEventListener('hashchange', onHashChange);
+  }, [view]);
+
+  useLayoutEffect(() => {
+    window.scrollTo(0, scrollTops.current[view] ?? 0);
+  }, [view]);
+
+  useEffect(() => {
+    document.title = signedIn ? TITLES[view] : 'Atlas';
+  }, [signedIn, view]);
 
   const loadDocuments = useCallback(async () => {
     try {
@@ -63,6 +91,9 @@ function App() {
     ['ask', 'Ask Atlas', Compass],
     ['library', 'Library', BookOpen],
   ];
+  const openLibrary = () => {
+    window.location.hash = '/library';
+  };
 
   return (
     <div className="shell">
@@ -86,12 +117,7 @@ function App() {
         <p className="nav-label">EXPLORE</p>
         <nav className="tabs" aria-label="Sections">
           {tabs.map(([id, label, Icon]) => (
-            <button
-              key={id}
-              className="tab"
-              aria-current={view === id ? 'page' : undefined}
-              onClick={() => setView(id)}
-            >
+            <a key={id} className="tab" href={`#/${id}`} aria-current={view === id ? 'page' : undefined}>
               <Icon size={18} />
               <span>{label}</span>
               {id === 'library' ? (
@@ -99,7 +125,7 @@ function App() {
               ) : (
                 <ChevronRight size={15} className="nav-arrow" />
               )}
-            </button>
+            </a>
           ))}
         </nav>
         <div className="sidebar-bottom">
@@ -111,7 +137,7 @@ function App() {
               <em>Grounded answers.</em>
             </p>
             <span>Build your library. Let curiosity lead.</span>
-            <button onClick={() => setView('library')}>
+            <button onClick={openLibrary}>
               Explore your library <ArrowUpRight size={15} />
             </button>
           </div>
@@ -151,7 +177,7 @@ function App() {
             </div>
           )}
           <div hidden={view !== 'ask'}>
-            <Ask readyCount={ready} loading={loading} loaded={loaded} onOpenLibrary={() => setView('library')} />
+            <Ask readyCount={ready} loading={loading} loaded={loaded} onOpenLibrary={openLibrary} />
           </div>
           <div hidden={view !== 'library'}>
             <Library documents={documents} onChange={loadDocuments} loading={loading} loaded={loaded} />
