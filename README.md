@@ -162,7 +162,7 @@ Documents are split into semantic chunks: sentences are embedded, and a new chun
 
 ### Answering
 
-`/ask` calls forge at temperature 0 with atlas's one forge key, marked `delegate: true` in forge's configuration, and names the tenant in `X-Forge-Subtenant`. forge therefore applies quotas, fair queueing and caching per tenant, with nothing to provision when a tenant is created or deleted. forge trusts atlas to name tenants correctly, so that key must stay on the server. The cache key covers the full prompt, including retrieved passages, so re-indexing a document invalidates cached answers. Follow-up questions are first rewritten into standalone questions.
+`/ask` calls forge at temperature 0 with atlas's one forge key, marked `delegate: true` in forge's configuration, and names the tenant in `X-Forge-Subtenant`. forge therefore applies quotas, fair queueing and caching per tenant, with nothing to provision when a tenant is created or deleted. forge trusts atlas to name tenants correctly, so that key must stay on the server. The cache key covers the full prompt, including retrieved passages, so re-indexing a document invalidates cached answers. Follow-up questions are first rewritten into standalone questions. Questions about a whole document ("summarize this", "what is my document about") name no topic for search to match, so they also get 12 passages spaced evenly through the tenant's newest documents.
 
 If the best passage scores below 0.25 cosine similarity (`ASK_MIN_SCORE`), atlas answers that the documents don't cover the question without calling the model. The threshold sits between the scores of answerable (0.42–0.72) and unanswerable (0.04–0.16) questions in the evaluation set.
 
@@ -205,7 +205,7 @@ Settings are read from the environment (see `app/config.py`). The most relevant:
 
 ```bash
 pip install -e '.[dev]'    # with the stack running for the database tests
-make test                  # 86 tests
+make test                  # 92 tests
 make eval                  # retrieval and grounding evaluation
 make drill                 # crash recovery
 make drill-fairness        # cross-tenant fairness

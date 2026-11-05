@@ -10,6 +10,7 @@ anything after it ever handles the raw PII.
 """
 
 import logging
+import re
 import time
 from typing import Literal
 
@@ -28,7 +29,7 @@ from app.core.answer import (
     format_context,
     format_history,
 )
-from app.core.retrieval import retrieve
+from app.core.retrieval import retrieve, spread
 from app.core.security import filter_output, is_injection, redact_pii
 from app.observability import tenant_stats
 from app.observability.metrics import SECURITY_EVENTS
@@ -38,6 +39,15 @@ log = logging.getLogger("atlas.ask")
 # extra passages fetched so that ones withheld by the injection screen don't
 # leave the answer with fewer than k
 OVERFETCH = 4
+# "Summarize this", "what is my document about": questions about a whole
+# document, which get passages from all through it as well as search's.
+# ponytail: a word list, so "sum it up" is missed; widen it as misses show up.
+WHOLE_DOCUMENT = re.compile(
+    r"\b(summar(y|ies|ise|ize)|overview|outline|tl;?dr|gist|main (points|ideas|topics|themes)"
+    r"|key (points|ideas|takeaways))\b|\bwhat\b.*\b(about|cover|covers|contain|contains)\W*$",
+    re.IGNORECASE,
+)
+SPREAD_PASSAGES = 12
 router = APIRouter(tags=["ask"])
 
 
@@ -116,6 +126,16 @@ async def ask(
 
         query_vec = await run_in_threadpool(state.embedder.embed_query, question)
         hits = await retrieve(session, tenant_id, query_vec, body.k + OVERFETCH)
+        whole = bool(WHOLE_DOCUMENT.search(question))
+        spread_hits = []
+        if whole:
+            seen = {(h.document_id, h.page, h.text) for h in hits}
+            spread_hits = [
+                h
+                for h in await spread(session, tenant_id, SPREAD_PASSAGES)
+                if (h.document_id, h.page, h.text) not in seen
+            ]
+            hits += spread_hits
         safe_hits = [h for h in hits if not is_injection(h.text)]
         if len(safe_hits) < len(hits):
             dropped = sorted({f"{h.document} p{h.page}" for h in hits if h not in safe_hits})
@@ -123,10 +143,12 @@ async def ask(
                 f"Left out passages that contain instructions aimed at the model: {', '.join(dropped)}"
             )
             await _event(state.redis, "chunk_dropped", tenant_id, ",".join(dropped))
-        safe_hits = safe_hits[: body.k]
+        searched = [h for h in safe_hits if h not in spread_hits][: body.k]
+        safe_hits = searched + [h for h in safe_hits if h in spread_hits]
         # Nothing relevant to ground an answer in: say so without spending
         # tokens, and without handing the model unrelated text to guess from.
-        if not safe_hits or safe_hits[0].score < state.settings.ask_min_score:
+        # A whole-document question matches nothing by design, so it has no floor.
+        if not safe_hits or (not whole and safe_hits[0].score < state.settings.ask_min_score):
             await tenant_stats.bump(state.redis, tenant_id, "declined")
             return AskOut(
                 answer=NO_CONTEXT_ANSWER,

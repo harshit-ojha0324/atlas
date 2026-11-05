@@ -4,6 +4,7 @@ import httpx
 import pytest
 from helpers import ZEBRA
 
+from app.api.routes_ask import SPREAD_PASSAGES, WHOLE_DOCUMENT
 from app.core.answer import RAG_PROMPT, format_context
 from app.core.retrieval import Hit
 
@@ -184,3 +185,31 @@ async def test_irrelevant_question_is_answered_without_the_llm(env, forge):
 
     out = (await ask(env, "a", ALPHA)).json()
     assert out["sources"][0]["document"] == "alpha.pdf" and len(calls) == 1
+
+
+@pytest.mark.parametrize(
+    "question, whole",
+    [
+        ("What is my document about?", True),
+        ("give me a summary", True),
+        ("What are the key points of chapter 3", True),
+        ("What does my library say about annual leave", False),
+        ("What is a schema?", False),
+    ],
+)
+def test_whole_document_questions_are_recognised(question, whole):
+    assert bool(WHOLE_DOCUMENT.search(question)) is whole
+
+
+async def test_whole_document_question_reads_all_through_the_document(env, forge):
+    _, calls = forge
+    env.settings.ask_min_score = 0.99  # nothing matches "about": search alone would decline
+    await env.upload("a", "long.pdf", [f"Section {n} of the river restoration plan." for n in range(1, 31)])
+    await env.upload("b", "zebra.pdf", [ZEBRA])
+    await env.drain()
+
+    out = (await ask(env, "a", "What is this document about?")).json()
+    pages = sorted({s["page"] for s in out["sources"]})
+    assert len(out["sources"]) >= SPREAD_PASSAGES and pages[0] <= 3 and pages[-1] >= 28
+    assert {s["document"] for s in out["sources"]} == {"long.pdf"}  # never another tenant's
+    assert len(calls) == 1 and "Serengeti" not in calls[0]["messages"][0]["content"]
