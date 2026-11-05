@@ -205,7 +205,7 @@ Settings are read from the environment (see `app/config.py`). The most relevant:
 
 ```bash
 pip install -e '.[dev]'    # with the stack running for the database tests
-make test                  # 85 tests
+make test                  # 86 tests
 make eval                  # retrieval and grounding evaluation
 make drill                 # crash recovery
 make drill-fairness        # cross-tenant fairness
@@ -249,7 +249,7 @@ The load test on a GitHub-hosted runner ([CI run 40813987003](https://github.com
 - Fair scheduling is per document; a very large PDF occupies a worker until it finishes.
 - PII and injection detection are pattern-based. Ten-digit numbers such as order IDs are redacted as phone numbers.
 - `/ask` does not stream responses.
-- The web interface's smoke test (`frontend/tests/ui-smoke.cjs`, 162 checks against API fixtures) runs locally with Playwright and is not part of CI.
+- The web interface's smoke test (`frontend/tests/ui-smoke.cjs`, 163 checks against API fixtures) runs locally with Playwright and is not part of CI.
 - There is no command to delete a tenant.
 - Every tenant gets the same forge quota and weight, set on atlas's entry in forge's tenants file.
 - A missing API key returns `422` rather than `401`.
