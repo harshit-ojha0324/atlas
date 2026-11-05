@@ -28,17 +28,17 @@ CHECKS = {
     "eval": (
         "Retrieval evaluation",
         [PY, "scripts/run_eval.py"],
-        [r"context relevance[^:]*: (\d+%)", r"grounded-response rate\s*: (\d+%)"],
+        [r"(context relevance)[^:]*: (\d+%)", r"(grounded-response rate)\s*: (\d+%)"],
     ),
     "drill": (
         "Worker killed mid-document",
         [PY, "scripts/drill_kill_worker.py"],
-        [r"(\d+/\d+ checks? pass\w*)"],
+        [r"control: (\d+ chunks)", r"PASS\s+(no duplicate chunks)", r"PASS\s+(nothing dead-lettered)"],
     ),
     "fairness": (
         "Noisy neighbour",
         [PY, "scripts/drill_noisy_neighbour.py"],
-        [r"(tenant B waited [\d.]+ ?s[^\n]*)"],
+        [r"B's one-page document (waited [\d.]+s behind A's backlog of \d+)"],
     ),
 }
 UI_CHECK = ("Interface smoke test", ["node", "frontend/tests/ui-smoke.cjs"], [r"(\d+ checks passed)"])
@@ -50,12 +50,13 @@ JUDGE_CHECK = (
 
 
 def summarize(output: str, patterns: list[str]) -> str:
-    found = [m.group(1).strip() for p in patterns if (m := re.search(p, output))]
+    found = [" ".join(m.groups()) for p in patterns if (m := re.search(p, output))]
     return ", ".join(found) if found else output.strip().splitlines()[-1][:120] if output.strip() else ""
 
 
 def demo() -> None:
     assert summarize("12 passed in 3s\n", [r"(\d+ passed)"]) == "12 passed"
+    assert summarize("rate (x) : 90%\n", [r"(rate)[^:]*: (\d+%)"]) == "rate 90%"
     assert summarize("a\nlast line\n", [r"(nope)"]) == "last line"
     assert summarize("", [r"(nope)"]) == ""
 
