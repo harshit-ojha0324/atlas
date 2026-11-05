@@ -1,11 +1,12 @@
 import { lazy, Suspense, useState, useEffect, useLayoutEffect, useCallback, useRef } from 'react';
 import { motion } from 'motion/react';
-import { BookOpen, Compass, LogOut, Plug } from 'lucide-react';
+import { Activity, BookOpen, Compass, LogOut, Network } from 'lucide-react';
 import Ask from './components/Ask';
-import Connect from './components/Connect';
+import Gateway from './components/Gateway';
 import Library from './components/Library';
 import SignIn from './components/SignIn';
 import Sphere from './components/Sphere';
+import System from './components/System';
 import api, { getKey, clearKey, setUnauthorizedHandler } from './services/api';
 import { savedTheme, saveTheme, ThemeContext } from './theme';
 import proCss from './pro.css?inline';
@@ -19,13 +20,15 @@ const POLL_MS = 1500;
 
 // Views live in the URL hash: the API serves the UI as static files, so a path
 // wouldn't survive a reload. Other hashes (the skip link's) leave the view alone.
-const VIEWS = { '': 'ask', '#/ask': 'ask', '#/library': 'library', '#/connect': 'connect' };
-const TITLES = { ask: 'Ask Atlas', library: 'Library | Atlas', connect: 'Connect | Atlas' };
+const VIEWS = { '': 'ask', '#/ask': 'ask', '#/library': 'library', '#/gateway': 'gateway', '#/system': 'system' };
+const TITLES = { ask: 'Ask Atlas', library: 'Library | Atlas', gateway: 'Gateway | Atlas', system: 'System | Atlas' };
+const TITAN_VIEWS = ['ask', 'library']; // the titan keeps its two original tabs
 
 const TABS = [
   ['ask', 'Ask Atlas', Compass],
   ['library', 'Library', BookOpen],
-  ['connect', 'Connect', Plug],
+  ['gateway', 'Gateway', Network],
+  ['system', 'System', Activity],
 ];
 
 function App() {
@@ -33,7 +36,7 @@ function App() {
   const titan = theme === 'titan';
   const [signedIn, setSignedIn] = useState(Boolean(getKey()));
   const [route, setView] = useState(VIEWS[window.location.hash] ?? 'ask');
-  const view = titan && route === 'connect' ? 'ask' : route; // the titan keeps its two original tabs
+  const view = titan && !TITAN_VIEWS.includes(route) ? 'ask' : route;
   const [navigated, setNavigated] = useState(false); // past the opening reveal
   const scrollTops = useRef({});
   const [documents, setDocuments] = useState([]);
@@ -143,7 +146,7 @@ function App() {
             {!titan && <small>Multi-tenant RAG</small>}
           </div>
           <nav className="tabs" aria-label="Sections">
-            {TABS.filter(([id]) => !titan || id !== 'connect').map(([id, label, Icon]) => (
+            {TABS.filter(([id]) => !titan || TITAN_VIEWS.includes(id)).map(([id, label, Icon]) => (
               <a key={id} className="tab" href={`#/${id}`} aria-current={view === id ? 'page' : undefined}>
                 <Icon size={17} />
                 <span>{label}</span>
@@ -196,9 +199,14 @@ function App() {
             <Library documents={documents} onChange={loadDocuments} loading={loading} loaded={loaded} />
           </div>
           {!titan && (
-            <div className="view" hidden={view !== 'connect'}>
-              <Connect active={view === 'connect'} />
-            </div>
+            <>
+              <div className="view" hidden={view !== 'gateway'}>
+                <Gateway active={view === 'gateway'} />
+              </div>
+              <div className="view" hidden={view !== 'system'}>
+                <System active={view === 'system'} />
+              </div>
+            </>
           )}
         </main>
       </div>

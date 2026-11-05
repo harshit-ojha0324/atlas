@@ -69,6 +69,26 @@ async function noOverflow(page, label) {
     let uploadError = false;
     let nextAnswer = null;
     let forgeDown = false;
+    let gatewayStatus = {
+      quota: { used_tokens: 1234, daily_token_quota: 200000, remaining_tokens: 198766 },
+      breaker: 'closed',
+      rate_limits: {
+        query: { capacity: 30, refill_per_s: 1, available: 27.4 },
+        upload: { capacity: 10, refill_per_s: 0.2, available: 10 },
+      },
+      answers: { window_days: 7, by_backend: { gemini: 3, cache: 1 }, declined: 2, failed: 0 },
+      latency: { samples: 4, p50_ms: 812, p95_ms: 2150 },
+    };
+    const systemStatus = {
+      workers_live: 2,
+      ingest: { waiting: 1, in_progress: 0 },
+      documents: { ready: 2, pending: 0, failed: 1, pages: 18, passages: 56 },
+      security: { window_days: 7, pii_redacted: 3, injection_blocked: 1, history_turn_dropped: 0, chunk_dropped: 2, output_filtered: 0 },
+      verification: [
+        { id: 'drill', label: 'Worker killed mid-document', passed: true, detail: '7/7 checks passed', date: '2026-11-05', commit: 'abc1234' },
+        { id: 'eval', label: 'Retrieval evaluation', passed: false, detail: 'below threshold', date: '2026-11-04', commit: 'def5678' },
+      ],
+    };
     let titanLoaded = false;
     page.on('request', (request) => {
       if (request.url().includes('TitanWorld')) titanLoaded = true;
@@ -85,11 +105,13 @@ async function noOverflow(page, label) {
     await page.route('**/*', async (route) => {
       const request = route.request();
       const url = new URL(request.url());
-      if (!/^\/(documents(?:\/\d+)?|ask|search|readyz)$/.test(url.pathname)) return route.continue();
+      if (!/^\/(documents(?:\/\d+)?|ask|search|readyz|gateway|system)$/.test(url.pathname)) return route.continue();
       const reply = (body, status = 200, headers = {}) =>
         route.fulfill({ status, contentType: 'application/json', body: JSON.stringify(body), headers });
       if (url.pathname === '/readyz') return reply({ redis: 'ok', postgres: 'ok', forge: forgeDown ? 'down' : 'ok' });
       if (request.headers()['x-api-key'] !== fixtureKey) return reply({ detail: 'Invalid API key' }, 401);
+      if (url.pathname === '/gateway') return reply(gatewayStatus);
+      if (url.pathname === '/system') return reply(systemStatus);
       if (url.pathname === '/documents' && request.method() === 'GET') {
         if (listError) return reply({ detail: 'Temporarily unavailable' }, 503);
         if (documents.some((d) => d.status === 'pending') && ++pendingReads >= 2)
@@ -541,25 +563,66 @@ async function noOverflow(page, label) {
         .click();
       await noOverflow(page, `${width}px Library`);
       if (width === 390) await page.screenshot({ path: `${output}/library-mobile.png`, fullPage: true });
-      await page.getByRole('navigation').getByRole('link', { name: 'Connect' }).click();
-      await noOverflow(page, `${width}px Connect`);
+      await page.getByRole('navigation').getByRole('link', { name: 'Gateway' }).click();
+      await noOverflow(page, `${width}px Gateway`);
+      await page.getByRole('navigation').getByRole('link', { name: 'System' }).click();
+      await noOverflow(page, `${width}px System`);
       await page.getByRole('navigation').getByRole('link', { name: 'Ask Atlas' }).click();
     }
     await page.setViewportSize({ width: 1440, height: 1000 });
-    forgeDown = true;
-    await page.getByRole('navigation').getByRole('link', { name: 'Connect' }).click();
-    await page.waitForURL('**/#/connect');
-    await page.locator('.service[data-state="down"]').waitFor();
+    await page.getByRole('navigation').getByRole('link', { name: 'Gateway' }).click();
+    await page.waitForURL('**/#/gateway');
+    const gatewayPage = page.locator('.view:not([hidden]) .connect');
+    await gatewayPage.getByText('Tokens used today').waitFor();
+    check((await gatewayPage.innerText()).includes('1,234'), 'Gateway shows the tokens this workspace used');
+    check((await gatewayPage.innerText()).includes('27'), 'Gateway shows the questions available, rounded down');
+    check((await gatewayPage.innerText()).includes('In use'), 'Gateway says the primary model is in use');
+    check((await gatewayPage.innerText()).includes('25%'), 'Gateway works out the share of cached answers');
+    check((await gatewayPage.innerText()).includes('2,150 ms'), 'Gateway shows the slowest 5% of answers');
+    check((await gatewayPage.locator('.backend-list li').count()) === 2, 'Gateway lists answers by model');
+    check(!(await gatewayPage.innerText()).includes(fixtureKey), 'Gateway never prints the workspace key');
+    gatewayStatus = {
+      ...gatewayStatus,
+      quota: null,
+      breaker: 'open',
+      answers: { ...gatewayStatus.answers, failed: 4 },
+    };
+    await page.reload();
+    await gatewayPage.getByText('forge didn’t answer, so this is unknown.').waitFor();
+    check((await gatewayPage.innerText()).includes('Skipped'), 'an open breaker says the primary model is skipped');
+    check((await gatewayPage.locator('[data-alert]').count()) === 1, 'failed answers stand out');
     check(
-      (await page.locator('.service[data-state="ok"]').count()) === 2 &&
-        (await page.locator('.service[data-state="down"]').innerText()).includes('forge'),
-      'Connect shows live readiness, service by service',
+      !(await gatewayPage.locator('.meter-card').first().innerText()).includes('0'),
+      'an unknown quota is shown as unknown, not zero',
+    );
+    forgeDown = true;
+    await page.getByRole('navigation').getByRole('link', { name: 'System' }).click();
+    await page.waitForURL('**/#/system');
+    const systemPage = page.locator('.view:not([hidden]) .connect');
+    await systemPage.locator('.service[data-state="down"]').waitFor();
+    check(
+      (await systemPage.locator('.service[data-state="ok"]').count()) === 2 &&
+        (await systemPage.locator('.service[data-state="down"]').innerText()).includes('forge'),
+      'System shows live readiness, service by service',
     );
     forgeDown = false;
+    await systemPage.getByText('Workers alive').waitFor();
     check(
-      !(await page.locator('.connect').innerText()).includes(fixtureKey),
-      'Connect never prints the workspace key',
+      (await systemPage.locator('.system-grid').innerText()).replace(/\s+/g, ' ').includes('Workers alive 2'),
+      'System shows the workers alive',
     );
+    check((await systemPage.locator('[data-alert]').count()) === 1, 'failed documents stand out');
+    check(
+      (await systemPage.locator('.security-list li').first().innerText()).startsWith('3'),
+      'System shows this workspace’s security events',
+    );
+    const recorded = await systemPage.locator('.verification-list').innerText();
+    check(
+      recorded.includes('2026-11-05') && recorded.includes('abc1234'),
+      'each verification result shows when and at which commit it ran',
+    );
+    check((await systemPage.locator('.check-result.failed').count()) === 1, 'a failed check is shown as failed');
+    check((await page.locator('.tab').count()) === 4, 'the professional theme has four tabs');
     await page.getByRole('navigation').getByRole('link', { name: 'Ask Atlas' }).click();
     await page.getByRole('button', { name: 'Sign out', exact: true }).click();
     for (const width of [1440, 768, 390, 320]) {

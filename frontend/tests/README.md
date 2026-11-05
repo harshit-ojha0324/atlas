@@ -36,7 +36,7 @@ load, empty states, conversation retention between sections, answer placement,
 formatting and announcement, citations that open their source and return,
 retained failed questions, view URLs with Back,
 reload and per-view scroll, starter cards staying clear of the composer from
-600 to 1080 pixels tall, live readiness on Connect, the seven-click easter egg
+600 to 1080 pixels tall, live numbers on Gateway and System with unknowns shown as unknown, the seven-click easter egg
 and the titan scene following app state, reduced motion, and responsive layouts
 at 320, 390, 768, 1024, and 1440 pixels.
 
