@@ -1890,7 +1890,8 @@ progress::-moz-progress-bar {
     grid-column: 9 / -1;
   }
 }
-@media (max-width: 1180px) {
+/* the status can run to "3 documents ready · 1 processing", so the bar gives way early */
+@media (max-width: 1340px) {
   .brand > small {
     display: none;
   }
@@ -1904,7 +1905,7 @@ progress::-moz-progress-bar {
     grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 }
-@media (max-width: 1000px) {
+@media (max-width: 1180px) {
   .connection > span {
     position: absolute;
     width: 1px;

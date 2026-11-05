@@ -623,6 +623,16 @@ async function noOverflow(page, label) {
     );
     check((await systemPage.locator('.check-result.failed').count()) === 1, 'a failed check is shown as failed');
     check((await page.locator('.tab').count()) === 4, 'the professional theme has four tabs');
+    documents.push({ id: 9, name: 'Still processing.pdf', status: 'pending', pages: null, chunk_count: 0 });
+    pendingReads = -1000; // stays pending for these checks
+    await page.reload();
+    await visible(page, '2 documents ready · 1 processing');
+    for (const width of [1400, 1341, 1340, 1280, 1181, 1180, 1024, 941, 940, 800]) {
+      await page.setViewportSize({ width, height: 800 });
+      await noOverflow(page, `${width}px, with the longest status`);
+    }
+    await page.setViewportSize({ width: 1440, height: 1000 });
+    documents = documents.filter((d) => d.id !== 9);
     await page.getByRole('navigation').getByRole('link', { name: 'Ask Atlas' }).click();
     await page.getByRole('button', { name: 'Sign out', exact: true }).click();
     for (const width of [1440, 768, 390, 320]) {
