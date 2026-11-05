@@ -68,6 +68,16 @@ async function noOverflow(page, label) {
     let deleteError = false;
     let uploadError = false;
     let nextAnswer = null;
+    let forgeDown = false;
+    let titanLoaded = false;
+    page.on('request', (request) => {
+      if (request.url().includes('TitanWorld')) titanLoaded = true;
+    });
+    const filterBy = (name) =>
+      page.getByRole('group', { name: 'Filter by status' }).getByRole('button', { name: new RegExp(`^${name}`) }).click();
+    const knock = async (times) => {
+      for (let i = 0; i < times; i++) await page.locator('.signin .brand-name').click();
+    };
     const asks = [];
     let uploads = 0;
     let deletes = 0;
@@ -75,9 +85,10 @@ async function noOverflow(page, label) {
     await page.route('**/*', async (route) => {
       const request = route.request();
       const url = new URL(request.url());
-      if (!/^\/(documents(?:\/\d+)?|ask|search)$/.test(url.pathname)) return route.continue();
+      if (!/^\/(documents(?:\/\d+)?|ask|search|readyz)$/.test(url.pathname)) return route.continue();
       const reply = (body, status = 200, headers = {}) =>
         route.fulfill({ status, contentType: 'application/json', body: JSON.stringify(body), headers });
+      if (url.pathname === '/readyz') return reply({ redis: 'ok', postgres: 'ok', forge: forgeDown ? 'down' : 'ok' });
       if (request.headers()['x-api-key'] !== fixtureKey) return reply({ detail: 'Invalid API key' }, 401);
       if (url.pathname === '/documents' && request.method() === 'GET') {
         if (listError) return reply({ detail: 'Temporarily unavailable' }, 503);
@@ -125,6 +136,7 @@ async function noOverflow(page, label) {
 
     await page.goto(origin);
     await visible(page, 'Welcome to Atlas.');
+    check((await page.locator('.stage').count()) === 0 && !titanLoaded, 'the professional theme is the default, with no titan loaded');
     check(
       await page.getByRole('button', { name: 'Enter your workspace' }).isDisabled(),
       'blank API key cannot submit',
@@ -155,8 +167,7 @@ async function noOverflow(page, label) {
     await page.screenshot({ path: `${output}/ask-desktop.png`, fullPage: true });
     check(
       (await page
-        .locator('.titan-heat')
-        .first()
+        .locator('.connection-dot')
         .evaluate((el) => getComputedStyle(el).animationName)) === 'none',
       'reduced motion disables decorative animation',
     );
@@ -202,9 +213,12 @@ async function noOverflow(page, label) {
       'answer formatting remains safe React markup',
     );
     await visible(page, 'Personal details removed: email address');
+    await visible(page, answer.sources[0].excerpt);
+    check(await page.locator('details').evaluate((el) => el.open), 'a cited source starts open beside its answer');
     await page.locator('summary').focus();
     await page.keyboard.press('Enter');
-    await visible(page, answer.sources[0].excerpt);
+    check(await page.locator('details').evaluate((el) => !el.open), 'source disclosure closes by keyboard');
+    await page.keyboard.press('Enter');
     check(await page.locator('details').evaluate((el) => el.open), 'source disclosure opens by keyboard');
     await page.screenshot({ path: `${output}/answer-desktop.png`, fullPage: true });
     await page
@@ -215,13 +229,13 @@ async function noOverflow(page, label) {
     await page.screenshot({ path: `${output}/library-desktop.png`, fullPage: true });
     await page.getByLabel('Search documents').fill('research');
     check(await docCount(page, 1), 'document search filters locally');
-    await page.getByLabel('Filter by status').selectOption('failed');
+    await filterBy('Failed');
     await visible(page, 'No documents found.');
     await page.getByRole('button', { name: 'Clear filters' }).click();
     check(await docCount(page, 3), 'clear filters restores documents');
-    await page.getByLabel('Filter by status').selectOption('failed');
+    await filterBy('Failed');
     check(await docCount(page, 1), 'status filter finds failed document');
-    await page.getByLabel('Filter by status').selectOption('all');
+    await filterBy('All');
     await page.getByRole('navigation').getByRole('link', { name: 'Ask Atlas' }).click();
     await visible(page, 'Answered by Gemini');
     check((await page.locator('.turn').count()) === 1, 'conversation survives switching sections');
@@ -259,7 +273,8 @@ async function noOverflow(page, label) {
       await page
         .waitForFunction(() => {
           const top = [...document.querySelectorAll('.turn')].pop().getBoundingClientRect().top;
-          return top >= 0 && top < 100;
+          const composer = document.querySelector('.composer form').getBoundingClientRect().bottom;
+          return top >= composer - 4 && top < composer + 100;
         }, null, { timeout: 2000 })
         .then(() => true, () => false),
       'a long answer opens at its question, not its end',
@@ -315,10 +330,14 @@ async function noOverflow(page, label) {
       'an answer with no citations leaves its sources undimmed',
     );
     const toSource2 = cited.getByRole('button', { name: 'Source 2: Research notes.pdf, page 2' });
-    await toSource2.click();
     const source2 = cited.locator('details').nth(1);
+    await source2.locator('summary').click();
+    check(await source2.evaluate((el) => !el.open), 'a source can be closed');
+    await toSource2.hover();
+    check(await source2.evaluate((el) => el.classList.contains('hinted')), 'pointing at a citation lights its source');
+    await toSource2.click();
     check(await source2.evaluate((el) => el.open), 'a citation opens its source');
-    check(await cited.locator('details').first().evaluate((el) => !el.open), 'a citation opens only its source');
+    check(await cited.locator('details').nth(2).evaluate((el) => !el.open), 'a citation opens only its source');
     check(
       await source2.locator('summary').evaluate((el) => el === document.activeElement),
       'a citation moves focus to its source',
@@ -326,7 +345,8 @@ async function noOverflow(page, label) {
     check(
       await source2.evaluate((el) => {
         const { top, bottom } = el.getBoundingClientRect();
-        return top >= 0 && bottom <= document.querySelector('.composer form').getBoundingClientRect().top;
+        const form = document.querySelector('.composer form').getBoundingClientRect();
+        return top >= form.bottom && bottom <= innerHeight;
       }),
       'the opened source is on screen, clear of the composer',
     );
@@ -417,7 +437,7 @@ async function noOverflow(page, label) {
     await page.getByRole('navigation').getByRole('link', { name: /Library/ }).click();
     await visible(page, 'Your documents couldn’t be loaded.');
     check(
-      (await page.getByText('Nothing to carry yet.').count()) === 0 &&
+      (await page.getByText('No documents yet.').count()) === 0 &&
         (await page.locator('.library-stats strong').first().textContent()) === '—',
       'an outage on load does not claim the library is empty',
     );
@@ -479,7 +499,7 @@ async function noOverflow(page, label) {
     );
     check((await page.locator('.turn').count()) === 0, 'sign-out clears conversation');
     await page.getByRole('button', { name: 'Open library', exact: true }).click();
-    await visible(page, 'Nothing to carry yet.');
+    await visible(page, 'No documents yet.');
     documents = structuredClone(initialDocuments);
     await page.getByRole('navigation').getByRole('link', { name: 'Ask Atlas' }).click();
     await visible(page, '2 documents ready');
@@ -490,7 +510,7 @@ async function noOverflow(page, label) {
         await page.evaluate(() => {
           const cards = document.querySelector('.prompt-grid').getBoundingClientRect();
           const composer = document.querySelector('.composer form').getBoundingClientRect();
-          return cards.bottom <= composer.top;
+          return cards.bottom <= composer.top || cards.top >= composer.bottom;
         }),
         `${width}x${height}: the composer does not cover the starters`,
       );
@@ -521,8 +541,26 @@ async function noOverflow(page, label) {
         .click();
       await noOverflow(page, `${width}px Library`);
       if (width === 390) await page.screenshot({ path: `${output}/library-mobile.png`, fullPage: true });
+      await page.getByRole('navigation').getByRole('link', { name: 'Connect' }).click();
+      await noOverflow(page, `${width}px Connect`);
       await page.getByRole('navigation').getByRole('link', { name: 'Ask Atlas' }).click();
     }
+    await page.setViewportSize({ width: 1440, height: 1000 });
+    forgeDown = true;
+    await page.getByRole('navigation').getByRole('link', { name: 'Connect' }).click();
+    await page.waitForURL('**/#/connect');
+    await page.locator('.service[data-state="down"]').waitFor();
+    check(
+      (await page.locator('.service[data-state="ok"]').count()) === 2 &&
+        (await page.locator('.service[data-state="down"]').innerText()).includes('forge'),
+      'Connect shows live readiness, service by service',
+    );
+    forgeDown = false;
+    check(
+      !(await page.locator('.connect').innerText()).includes(fixtureKey),
+      'Connect never prints the workspace key',
+    );
+    await page.getByRole('navigation').getByRole('link', { name: 'Ask Atlas' }).click();
     await page.getByRole('button', { name: 'Sign out', exact: true }).click();
     for (const width of [1440, 768, 390, 320]) {
       await page.setViewportSize({ width, height: 844 });
@@ -542,6 +580,47 @@ async function noOverflow(page, label) {
       (await page.evaluate(() => sessionStorage.getItem('atlas.apiKey'))) === null,
       '401 responses sign out and clear the expired key',
     );
+    await page.setViewportSize({ width: 1440, height: 1000 });
+
+    // The easter egg: seven clicks on the name.
+    await knock(6);
+    check((await page.locator('.stage').count()) === 0 && !titanLoaded, 'six clicks on the name do nothing');
+    await page.waitForTimeout(2100);
+    await knock(6);
+    check((await page.locator('.stage').count()) === 0, 'a pause starts the count again');
+    await knock(1);
+    await page.locator('.stage').waitFor({ state: 'attached' });
+    check(titanLoaded, 'the seventh click brings the titan, loaded only then');
+    check(
+      (await page.locator('.titan-heat').first().evaluate((el) => getComputedStyle(el).animationName)) === 'none',
+      'reduced motion stills the titan too',
+    );
+    await page.locator('h1', { hasText: 'He holds up the sky.' }).waitFor();
+    await page.getByLabel('Workspace API key').fill(fixtureKey);
+    await page.getByRole('button', { name: 'Enter your workspace' }).click();
+    await visible(page, '2 documents ready');
+    check(
+      (await page.getByRole('navigation', { name: 'Sections' }).getByRole('link').count()) === 2,
+      'the titan keeps its two original tabs',
+    );
+    await page.getByRole('navigation').getByRole('link', { name: 'Ask Atlas' }).click();
+    await page.locator('h1', { hasText: 'The weight of knowledge.' }).waitFor();
+    await page.getByRole('navigation').getByRole('link', { name: /Library/ }).click();
+    await page.getByLabel('Filter by status').selectOption('failed');
+    check(await docCount(page, 1), 'the titan keeps its status filter');
+    await page.getByLabel('Filter by status').selectOption('all');
+    await docCount(page, 3);
+    await page.reload();
+    await visible(page, '2 documents ready');
+    check((await page.locator('.stage').count()) === 1, 'a reload stays with the titan');
+    for (const width of [768, 390, 320]) {
+      await page.setViewportSize({ width, height: 844 });
+      await noOverflow(page, `titan ${width}px Library`);
+    }
+    await page.setViewportSize({ width: 1440, height: 1000 });
+    await page.getByRole('navigation').getByRole('link', { name: 'Ask Atlas' }).click();
+    await page.getByRole('button', { name: 'Sign out', exact: true }).click();
+
     await page.emulateMedia({ reducedMotion: 'no-preference' });
     await page.reload();
     await visible(page, 'Welcome to Atlas.');
@@ -585,6 +664,27 @@ async function noOverflow(page, label) {
     check((await page.locator('.tab-seam').count()) === 1, 'one seam marks the open section');
     await page.getByLabel('Search documents').fill('research');
     check(await docCount(page, 1), 'with normal motion, filtered rows still leave');
+    await page.getByRole('button', { name: 'Sign out', exact: true }).click();
+    await knock(7);
+    await page.locator('h1', { hasText: 'Answers you can check.' }).waitFor();
+    check((await page.locator('.stage').count()) === 0, 'seven more clicks go back to the professional theme');
+    await page.getByLabel('Workspace API key').fill(fixtureKey);
+    await page.getByRole('button', { name: 'Enter your workspace' }).click();
+    await visible(page, '2 documents ready');
+    await page.getByRole('navigation').getByRole('link', { name: 'Ask Atlas' }).click();
+    const box = page.getByRole('textbox', { name: 'Your question' });
+    await box.fill('How much leave?');
+    await box.press('Enter');
+    await visible(page, 'Answered by Gemini');
+    check(
+      await box.evaluate((el) => el === document.activeElement),
+      'asking the first question leaves focus in the composer',
+    );
+    const fresh = await context.newPage();
+    await fresh.goto(origin);
+    await fresh.getByText('Welcome to Atlas.', { exact: true }).waitFor();
+    check((await fresh.locator('.stage').count()) === 0, 'a new tab starts on the professional theme');
+    await fresh.close();
     check(errors.length === 0, `no browser runtime errors (${errors.join('; ')})`);
     console.log(`\n${checks} checks passed. Screenshots: ${output}`);
   } finally {

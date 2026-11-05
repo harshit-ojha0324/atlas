@@ -36,8 +36,9 @@ load, empty states, conversation retention between sections, answer placement,
 formatting and announcement, citations that open their source and return,
 retained failed questions, view URLs with Back,
 reload and per-view scroll, starter cards staying clear of the composer from
-600 to 1080 pixels tall, the titan scene following app state, reduced motion,
-and responsive layouts at 320, 390, 768, 1024, and 1440 pixels.
+600 to 1080 pixels tall, live readiness on Connect, the seven-click easter egg
+and the titan scene following app state, reduced motion, and responsive layouts
+at 320, 390, 768, 1024, and 1440 pixels.
 
 These checks verify frontend behavior and API request compatibility. They do not
 replace a live backend test of PDF ingestion, retrieval, or model generation.
