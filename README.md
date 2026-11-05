@@ -4,7 +4,7 @@
 
 atlas is a multi-tenant retrieval-augmented generation (RAG) service. Tenants upload PDFs and ask questions about them in a web interface, over a REST API, or as MCP tools. Background workers parse, chunk and embed documents into Postgres with pgvector. Answers are generated through [forge](https://github.com/harshit-ojha0324/forge), an LLM gateway that provides per-tenant quotas, response caching and failover between models.
 
-<img src="docs/images/ui-home.png" alt="Atlas web interface: a chained stone titan with molten veins holds up a cracked, burning sky above the question box and three suggestion cards" width="860">
+<img src="docs/images/ui-ask.png" alt="Atlas web interface: an answer from Gemini about vacation, parental leave and remote work, with numbered citations beside its sources, 3 of 4 cited" width="860">
 
 - Tenant isolation. Every query, rate limit, model quota and cached answer is scoped to the tenant.
 - Fair ingestion. Each tenant has its own queue, so one tenant's backlog doesn't delay another's documents.
@@ -34,7 +34,7 @@ atlas is a multi-tenant retrieval-augmented generation (RAG) service. Tenants up
 | Queueing, rate limits | Redis 7: Streams and a Lua token bucket |
 | Embeddings | `all-MiniLM-L6-v2` (sentence-transformers, CPU) |
 | Generation | forge (OpenAI-compatible gateway) |
-| Web interface | React 18, Vite and Motion, built into the image and served by the API; the titan scene is SVG, CSS and canvas |
+| Web interface | React 18, Vite and Motion, built into the image and served by the API |
 | Agent interface | MCP (`mcp` SDK, streamable HTTP or stdio) |
 
 ## Quick start
@@ -69,16 +69,19 @@ All ports are bound to localhost.
 The API serves a web interface at `/`, so it shares the API's origin and needs no CORS setup.
 
 - **Sign in** with a workspace's API key. The key is kept for the browser tab only and cleared when it closes.
-- **Ask** answers questions and keeps the conversation for follow-ups. Each `[n]` citation in an answer opens the passage it came from, and passages the answer didn't cite are dimmed. Any security notes and the model that answered are shown with the answer. Suggestion cards start a question for you to finish with a topic.
-- **Library** shows document counts, search and a status filter. New uploads show as processing and switch to ready (or failed, with the reason) on their own.
+- **Ask** answers questions and keeps the conversation for follow-ups. On wide screens the sources sit beside the answer. Each `[n]` citation opens and highlights the passage it came from, and passages the answer didn't cite are collapsed and dimmed. Any security notes and the model that answered are shown with the answer. Suggestion cards start a question for you to finish with a topic.
+- **Library** shows document and passage counts, search and a status filter. New uploads show as processing and switch to ready (or failed, with the reason) on their own.
+- **Connect** shows live readiness for Postgres, Redis and forge, and how to reach the workspace over REST and MCP.
 
-The header is the sky that Atlas holds up, and the scene behind each page follows the app. The camera moves between views, his veins light up as the library grows, each document that isn't failed adds a star, and he burns hotter while reading. The animation stops for visitors who ask for reduced motion.
+The sign-in screen also hides an easter egg.
 
-<img src="docs/images/ui-ask.png" alt="An answer from Gemini about vacation, parental leave and remote work, with numbered citations and a sources list showing 3 of 4 cited" width="720">
+<img src="docs/images/ui-home.png" alt="Ask page: document and passage counts, the question box and three suggestion cards" width="720">
 
-<img src="docs/images/ui-library.png" alt="Library: three documents ready and a fourth processing" width="720">
+<img src="docs/images/ui-library.png" alt="Library: counts, an upload area, a note on what happens to a PDF, and a list with three documents ready and a fourth processing" width="720">
 
-<img src="docs/images/ui-signin.png" alt="Sign-in screen: the titan in full under the burning sky, beside the API key form" width="720">
+<img src="docs/images/ui-connect.png" alt="Connect page: Postgres, Redis and forge all reachable, with the REST endpoints and MCP tools listed" width="720">
+
+<img src="docs/images/ui-signin.png" alt="Sign-in screen: a large armillary sphere and three short points beside the API key form" width="720">
 
 To work on the interface, run `npm install` and `npm run dev` in `frontend/`; the development server forwards API calls to `localhost:8000`.
 
@@ -237,7 +240,7 @@ The load test on a GitHub-hosted runner ([CI run 40813987003](https://github.com
 - Fair scheduling is per document; a very large PDF occupies a worker until it finishes.
 - PII and injection detection are pattern-based. Ten-digit numbers such as order IDs are redacted as phone numbers.
 - `/ask` does not stream responses.
-- The web interface's smoke test (`frontend/tests/ui-smoke.cjs`, 106 checks against API fixtures) runs locally with Playwright and is not part of CI.
+- The web interface's smoke test (`frontend/tests/ui-smoke.cjs`, 132 checks against API fixtures) runs locally with Playwright and is not part of CI.
 - There is no command to delete a tenant.
 - Every tenant gets the same forge quota and weight, set on atlas's entry in forge's tenants file.
 - A missing API key returns `422` rather than `401`.
