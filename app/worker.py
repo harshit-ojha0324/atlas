@@ -310,10 +310,27 @@ class IngestWorker:
             await self.handle(stream, entry_id, fields)
         return len(entries)
 
+    async def beat(self) -> None:
+        """Say this worker is alive, and forget workers that stopped saying so."""
+        now = time.time()
+        key = self.settings.workers_key
+        await self.redis.zadd(key, {self.name: now})
+        await self.redis.zremrangebyscore(key, "-inf", now - self.settings.worker_heartbeat_ttl_s)
+
+    async def heartbeat(self) -> None:
+        # its own task: a big document holds the main loop for longer than the TTL
+        while not self.shutting_down:
+            try:
+                await self.beat()
+            except (RedisError, OSError) as exc:
+                log.warning("couldn't write heartbeat: %r", exc)
+            await asyncio.sleep(self.settings.worker_heartbeat_s)
+
     async def run(self) -> None:
         log.info(
             "worker %s consuming %s:* / %s", self.name, self.settings.stream_key, self.settings.stream_group
         )
+        heartbeat = asyncio.create_task(self.heartbeat())
         loop_n = 0
         while not self.shutting_down:
             try:
@@ -326,6 +343,7 @@ class IngestWorker:
                 log.exception("entry failed; left pending for retry")
                 await asyncio.sleep(2)
             loop_n += 1
+        heartbeat.cancel()
         log.info("graceful shutdown complete")
 
     def request_shutdown(self, *_):

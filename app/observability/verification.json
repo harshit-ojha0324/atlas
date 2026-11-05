@@ -1,0 +1,10 @@
+[
+  {
+    "id": "eval-judged",
+    "label": "Answer content, judged on a real model",
+    "passed": true,
+    "detail": "9/9 answers correct and citing the right page, on Gemini",
+    "date": "2026-11-03",
+    "commit": "a81308b"
+  }
+]

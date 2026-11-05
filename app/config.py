@@ -54,6 +54,10 @@ class Settings(BaseSettings):
     # attempts that died without finishing (crash, OOM, kill) before giving up
     worker_max_attempts: int = 3
     worker_metrics_port: int = 9100
+    # each worker writes its heartbeat here; one older than the TTL counts as gone
+    workers_key: str = "ingest:workers"
+    worker_heartbeat_s: float = 10.0
+    worker_heartbeat_ttl_s: float = 30.0
 
     def tenant_stream(self, tenant_id: int | str) -> str:
         return f"{self.stream_key}:{tenant_id}"

@@ -1,4 +1,4 @@
-.PHONY: up down clean logs ps tenant mcp test eval drill drill-fairness bench lint
+.PHONY: up down clean logs ps tenant mcp test eval drill drill-fairness bench verify lint
 
 up:            ## build + start the stack (api, worker, postgres, redis, forge + mock models)
 	docker compose up -d --build --wait
@@ -35,6 +35,9 @@ drill-fairness: ## one tenant's backlog must delay another tenant's upload by ~o
 
 bench:         ## k6 load test of /search and /ask (gates on errors and p95)
 	python scripts/bench.py
+
+verify:        ## run the checks and record the results shown on the System page (--ui, --judge: see the script)
+	python scripts/verify.py
 
 lint:
 	ruff check . && ruff format --check .

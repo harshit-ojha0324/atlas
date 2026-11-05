@@ -53,7 +53,17 @@ class RateLimiter:
     def __init__(self, redis: Redis):
         # redis-py's Script runs EVALSHA and, on NoScriptError (Redis restart
         # flushed the script cache), reloads and retries once
+        self._redis = redis
         self._take = redis.register_script(TOKEN_BUCKET_LUA)
+
+    async def peek(self, key_id: int | str, capacity: int, refill_per_s: float) -> float:
+        """Tokens available right now, without taking one. An untouched or expired
+        bucket is full. Raises RedisError when Redis is unavailable."""
+        tokens, ts = await self._redis.hmget(f"rl:{key_id}", "tokens", "ts")
+        if tokens is None or ts is None:
+            return float(capacity)
+        elapsed_s = max(0.0, time.time() * 1000 - float(ts)) / 1000
+        return min(float(capacity), float(tokens) + elapsed_s * refill_per_s)
 
     async def take(self, key_id: int | str, capacity: int, refill_per_s: float) -> RateDecision:
         """Raises RedisError when Redis is unavailable -- caller chooses the

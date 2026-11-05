@@ -8,7 +8,7 @@ from fastapi.staticfiles import StaticFiles
 from prometheus_client import CONTENT_TYPE_LATEST, generate_latest
 from redis.asyncio import BlockingConnectionPool, Redis
 
-from app.api import routes_ask, routes_documents, routes_health
+from app.api import routes_ask, routes_documents, routes_health, routes_system
 from app.config import get_settings
 from app.core.embeddings import Embedder
 from app.core.ratelimit import RateLimiter
@@ -57,6 +57,7 @@ def create_app() -> FastAPI:
     app.include_router(routes_health.router)
     app.include_router(routes_documents.router)
     app.include_router(routes_ask.router)
+    app.include_router(routes_system.router)
 
     # The web UI (frontend/, built into the image by the Dockerfile), served from
     # the API's own origin so the browser needs no CORS. Mounted last, so API

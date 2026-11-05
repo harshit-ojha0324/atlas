@@ -10,6 +10,7 @@ anything after it ever handles the raw PII.
 """
 
 import logging
+import time
 from typing import Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Request
@@ -29,6 +30,7 @@ from app.core.answer import (
 )
 from app.core.retrieval import retrieve
 from app.core.security import filter_output, is_injection, redact_pii
+from app.observability import tenant_stats
 from app.observability.metrics import SECURITY_EVENTS
 
 log = logging.getLogger("atlas.ask")
@@ -66,9 +68,10 @@ class AskOut(BaseModel):
     security_warnings: list[str]
 
 
-def _event(kind: str, tenant_id: int, detail: str = "") -> None:
+async def _event(redis, kind: str, tenant_id: int, detail: str = "") -> None:
     SECURITY_EVENTS.labels(kind=kind).inc()
     log.info("security tenant=%s %s %s", tenant_id, kind, detail)  # never logs the raw text
+    await tenant_stats.bump(redis, tenant_id, f"event:{kind}")
 
 
 @router.post("/ask")
@@ -79,14 +82,15 @@ async def ask(
     session: AsyncSession = Depends(get_session),
 ) -> AskOut:
     state = request.app.state
+    started = time.perf_counter()
     warnings: list[str] = []
 
     question, pii = redact_pii(body.question)
     if pii:
         warnings.append(f"PII redacted from the question: {', '.join(pii)}")
-        _event("pii_redacted", tenant_id, ",".join(pii))
+        await _event(state.redis, "pii_redacted", tenant_id, ",".join(pii))
     if is_injection(question):
-        _event("injection_blocked", tenant_id)
+        await _event(state.redis, "injection_blocked", tenant_id)
         raise HTTPException(status_code=400, detail="question blocked: it looks like a prompt injection")
     # Clients send history back as typed, so it gets the same redaction. A user
     # turn that fails the injection check is dropped, not refused: one blocked
@@ -95,7 +99,7 @@ async def ask(
     for m in body.history:
         content = redact_pii(m.content)[0]
         if m.role == "user" and is_injection(content):
-            _event("history_turn_dropped", tenant_id)
+            await _event(state.redis, "history_turn_dropped", tenant_id)
             continue
         history.append({"role": m.role, "content": content})
 
@@ -118,11 +122,12 @@ async def ask(
             warnings.append(
                 f"Left out passages that contain instructions aimed at the model: {', '.join(dropped)}"
             )
-            _event("chunk_dropped", tenant_id, ",".join(dropped))
+            await _event(state.redis, "chunk_dropped", tenant_id, ",".join(dropped))
         safe_hits = safe_hits[: body.k]
         # Nothing relevant to ground an answer in: say so without spending
         # tokens, and without handing the model unrelated text to guess from.
         if not safe_hits or safe_hits[0].score < state.settings.ask_min_score:
+            await tenant_stats.bump(state.redis, tenant_id, "declined")
             return AskOut(
                 answer=NO_CONTEXT_ANSWER,
                 question=question,
@@ -134,13 +139,15 @@ async def ask(
 
         reply = await llm(RAG_PROMPT.format(context=format_context(safe_hits), question=question))
     except ForgeFailure as e:
+        await tenant_stats.bump(state.redis, tenant_id, "failed")
         headers = {"Retry-After": e.retry_after} if e.retry_after else None
         raise HTTPException(status_code=e.status, detail=e.detail, headers=headers)
 
     answer, masked = filter_output(reply.text)
     if masked:
         warnings.append(f"Credentials masked in the answer: {', '.join(masked)}")
-        _event("output_filtered", tenant_id, ",".join(masked))
+        await _event(state.redis, "output_filtered", tenant_id, ",".join(masked))
+    await tenant_stats.record_answer(state.redis, tenant_id, reply.backend, time.perf_counter() - started)
     return AskOut(
         answer=answer,
         question=question,
