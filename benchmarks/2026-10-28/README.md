@@ -1,6 +1,6 @@
 # Benchmark, 2026-10-28
 
-`make bench`: k6 2.3.0 at a constant arrival rate for 60s, 50 req/s on `POST /search` and 10 req/s on `POST /ask`, against the full local stack. Raw numbers are in [`k6-summary.json`](k6-summary.json).
+`make bench`: k6 2.3.0 at a constant arrival rate for 60s, 50 req/s on `POST /search` and 10 req/s on `POST /ask`, against the full local stack.
 
 **Setup**
 - Apple M3 Pro. Docker Desktop VM: 11 CPUs, 8 GB.
