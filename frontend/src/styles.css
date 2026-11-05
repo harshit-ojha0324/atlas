@@ -563,7 +563,7 @@ h1 em {
   gap: 28px;
   min-height: 76px;
   padding: 0 36px;
-  background: linear-gradient(180deg, rgb(9 5 4 / 0.94) 62%, rgb(9 5 4 / 0));
+  background: linear-gradient(180deg, rgb(9 5 4) 80%, rgb(9 5 4 / 0));
 }
 .brand {
   display: flex;
@@ -832,7 +832,7 @@ h1 em {
   z-index: 2;
   padding: 18px 0 8px;
   margin-top: 4px;
-  background: linear-gradient(0deg, rgb(11 7 6 / 0.96) 76%, rgb(11 7 6 / 0));
+  background: linear-gradient(0deg, rgb(11 7 6) 76%, rgb(11 7 6 / 0));
 }
 /* forged iron that heats when you use it */
 .composer form {
