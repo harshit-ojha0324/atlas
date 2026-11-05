@@ -1,4 +1,4 @@
-.PHONY: up down clean logs ps tenant mcp test eval drill drill-fairness bench verify lint
+.PHONY: up down clean logs ps tenant new-key mcp test eval drill drill-fairness bench verify lint
 
 up:            ## build + start the stack (api, worker, postgres, redis, forge + mock models)
 	docker compose up -d --build --wait
@@ -16,7 +16,10 @@ ps:
 	docker compose ps
 
 tenant:        ## create a tenant and print its API key once: make tenant NAME=acme
-	docker compose run --rm --no-deps api python -m app.scripts.create_tenant $(NAME)
+	@docker compose run --rm --no-deps api python -m app.scripts.create_tenant $(NAME)
+
+new-key:       ## print another API key for an existing tenant, if you lost yours: make new-key NAME=acme
+	@docker compose run --rm --no-deps api python -m app.scripts.new_key $(NAME)
 
 mcp:           ## serve one tenant's documents over MCP on localhost:8090/mcp: make mcp KEY=atlas_...
 	ATLAS_API_KEY=$(KEY) docker compose --profile mcp up -d --build --wait mcp

@@ -44,6 +44,7 @@ Requirements: Docker, and a checkout of [forge](https://github.com/harshit-ojha0
 ```bash
 make up                      # api, worker, postgres, redis, forge with mock models
 make tenant NAME=acme        # prints the tenant's API key once
+make new-key NAME=acme       # lost it? prints another key; keys already issued keep working
 ```
 
 ```bash
@@ -204,7 +205,7 @@ Settings are read from the environment (see `app/config.py`). The most relevant:
 
 ```bash
 pip install -e '.[dev]'    # with the stack running for the database tests
-make test                  # 80 tests
+make test                  # 85 tests
 make eval                  # retrieval and grounding evaluation
 make drill                 # crash recovery
 make drill-fairness        # cross-tenant fairness
@@ -264,7 +265,7 @@ app/
   api/                    routes and dependencies (auth, rate limits)
   core/                   chunking, embeddings, retrieval, answering, security, rate limiter
   models/                 database models
-  scripts/create_tenant.py
+  scripts/create_tenant.py, new_key.py
 frontend/                 web interface (React, Vite)
 migrations/               Alembic migrations
 scripts/                  evaluation, drills, benchmark, shared helpers
