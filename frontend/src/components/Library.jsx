@@ -1,7 +1,9 @@
-import { useEffect, useRef, useState } from 'react';
-import { AnimatePresence, animate, motion, useMotionValue, useReducedMotion, useTransform } from 'motion/react';
+import { useRef, useState } from 'react';
+import { AnimatePresence, motion } from 'motion/react';
 import { Upload, Trash2, Loader, FileText, Search, BookOpen, Check, CloudOff, X } from 'lucide-react';
+import Stats from './Stats';
 import api from '../services/api';
+import { useCopy, useTheme } from '../theme';
 
 const MAX_BYTES = 10 * 1024 * 1024; // the API's upload limit
 
@@ -20,19 +22,16 @@ function detail(doc) {
   return 'Reading and indexing';
 }
 
-// A count that runs to its new value instead of swapping.
-function Count({ value }) {
-  const current = useMotionValue(value);
-  const text = useTransform(current, (v) => String(Math.round(v)).padStart(2, '0'));
-  const reduced = useReducedMotion();
-  useEffect(() => {
-    const run = animate(current, value, { duration: reduced ? 0 : 0.6, ease: 'easeOut' });
-    return () => run.stop();
-  }, [value, current, reduced]);
-  return <motion.strong>{text}</motion.strong>;
-}
+const FILTERS = [
+  ['all', 'All'],
+  ['ready', 'Ready'],
+  ['pending', 'Processing'],
+  ['failed', 'Failed'],
+];
 
 function Library({ documents, onChange, loading, loaded }) {
+  const copy = useCopy();
+  const pro = useTheme() === 'pro';
   const [uploading, setUploading] = useState(false);
   const [notice, setNotice] = useState(null);
   const [dragActive, setDragActive] = useState(false);
@@ -45,8 +44,6 @@ function Library({ documents, onChange, loading, loaded }) {
     (doc) =>
       doc.name.toLowerCase().includes(query.toLowerCase()) && (filter === 'all' || doc.status === filter),
   );
-  const ready = documents.filter((doc) => doc.status === 'ready').length;
-  const pending = documents.filter((doc) => doc.status === 'pending').length;
 
   const handleDrag = (e) => {
     e.preventDefault();
@@ -111,29 +108,10 @@ function Library({ documents, onChange, loading, loaded }) {
   return (
     <section className="library">
       <div className="library-heading">
-        <h1>What Atlas carries.</h1>
-        <p className="lede">Every answer stands on these documents. Add one and it joins the stars.</p>
+        <h1>{copy.libraryTitle}</h1>
+        <p className="lede">{copy.libraryLede}</p>
       </div>
-      <div className="library-stats">
-        <div>
-          <span>Documents</span>
-          {loaded ? <Count value={documents.length} /> : <strong>—</strong>}
-        </div>
-        <div>
-          <span>
-            <i className="stat-dot ready" />
-            Ready to ask
-          </span>
-          {loaded ? <Count value={ready} /> : <strong>—</strong>}
-        </div>
-        <div>
-          <span>
-            <i className="stat-dot pending" />
-            Processing
-          </span>
-          {loaded ? <Count value={pending} /> : <strong>—</strong>}
-        </div>
-      </div>
+      <Stats documents={documents} loaded={loaded} />
 
       <div
         className={dragActive ? 'dropzone active' : 'dropzone'}
@@ -147,7 +125,7 @@ function Library({ documents, onChange, loading, loaded }) {
           {uploading ? <Loader size={24} className="spin" /> : <Upload size={24} />}
         </div>
         <div className="dropzone-text">
-          <strong>{uploading ? 'Taking up the weight…' : 'Give Atlas something to carry.'}</strong>
+          <strong>{uploading ? copy.dropBusy : copy.dropTitle}</strong>
           <span>Drop a PDF here or choose a file. Up to 10 MB per document.</span>
         </div>
         <button
@@ -174,6 +152,24 @@ function Library({ documents, onChange, loading, loaded }) {
         />
       </div>
 
+      {pro && (
+        <aside className="library-guide" aria-labelledby="guide-title">
+          <h2 id="guide-title">What happens to a PDF</h2>
+          <ol>
+            <li>
+              <strong>Queued</strong> in your workspace’s own stream, so another tenant’s backlog can’t delay it.
+            </li>
+            <li>
+              <strong>Processed</strong> by a worker: parsed, split into passages and embedded locally.
+            </li>
+            <li>
+              <strong>Ready</strong> once its passages and status commit together, so a crash can’t index it twice.
+            </li>
+          </ol>
+          <p>The same file returns the existing document. New content under the same name replaces it once indexed.</p>
+        </aside>
+      )}
+
       {notice && (
         <div className={`notice ${notice.type}`} role={notice.type === 'error' ? 'alert' : 'status'}>
           {notice.type === 'ok' && <Check size={17} />}
@@ -196,12 +192,30 @@ function Library({ documents, onChange, loading, loaded }) {
               onChange={(e) => setQuery(e.target.value)}
             />
           </label>
-          <select aria-label="Filter by status" value={filter} onChange={(e) => setFilter(e.target.value)}>
-            <option value="all">All statuses</option>
-            <option value="ready">Ready</option>
-            <option value="pending">Processing</option>
-            <option value="failed">Failed</option>
-          </select>
+          {pro ? (
+            <div className="filter-pills" role="group" aria-label="Filter by status">
+              {FILTERS.map(([id, label]) => (
+                <button key={id} type="button" aria-pressed={filter === id} onClick={() => setFilter(id)}>
+                  {filter === id && (
+                    <motion.span
+                      layoutId="filter-active"
+                      className="filter-active"
+                      transition={{ type: 'spring', stiffness: 480, damping: 38 }}
+                    />
+                  )}
+                  <span>{label}</span>
+                  <small>{id === 'all' ? documents.length : documents.filter((d) => d.status === id).length}</small>
+                </button>
+              ))}
+            </div>
+          ) : (
+            <select aria-label="Filter by status" value={filter} onChange={(e) => setFilter(e.target.value)}>
+              <option value="all">All statuses</option>
+              <option value="ready">Ready</option>
+              <option value="pending">Processing</option>
+              <option value="failed">Failed</option>
+            </select>
+          )}
         </div>
       </div>
       {loading ? (
@@ -219,7 +233,7 @@ function Library({ documents, onChange, loading, loaded }) {
       ) : documents.length === 0 ? (
         <div className="doc-empty panel">
           <BookOpen size={30} strokeWidth={1.3} />
-          <h3>Nothing to carry yet.</h3>
+          <h3>{copy.libraryEmpty}</h3>
           <p>Your library is empty. Add a PDF to start asking questions.</p>
         </div>
       ) : filtered.length === 0 ? (

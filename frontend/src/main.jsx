@@ -1,9 +1,10 @@
 import { StrictMode } from 'react'
 import ReactDOM from 'react-dom/client'
 import { MotionConfig } from 'motion/react'
-import '@fontsource-variable/cinzel'
+import '@fontsource-variable/space-grotesk'
+import '@fontsource-variable/geist'
+import '@fontsource-variable/jetbrains-mono'
 import App from './App'
-import './styles.css'
 
 ReactDOM.createRoot(document.getElementById('root')).render(
   <StrictMode>

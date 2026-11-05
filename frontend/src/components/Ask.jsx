@@ -14,7 +14,9 @@ import {
   Sparkles,
 } from 'lucide-react';
 import Sphere from './Sphere';
+import Stats from './Stats';
 import api from '../services/api';
+import { useCopy, useTheme } from '../theme';
 
 // The API accepts up to 20 history messages (10 question-answer turns) of up to
 // 4,000 characters each.
@@ -60,6 +62,9 @@ const RISE = {
 
 const scrollBehavior = () =>
   window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'instant' : 'smooth';
+
+// Where pro.css puts the sources beside the answer, so the evidence starts open.
+const SIDE_BY_SIDE = '(min-width: 1100px)';
 
 function Prose({ text, cite }) {
   const blocks = [];
@@ -125,20 +130,26 @@ const STARTERS = [
 ];
 
 function Turn({ turn }) {
+  const pro = useTheme() === 'pro';
+  const copy = useCopy();
   const [followed, setFollowed] = useState(null); // the citation last followed: { n, from }
+  const [hinted, setHinted] = useState(null); // the citation under the pointer or focus
+  const [evidenceOpen] = useState(() => pro && window.matchMedia(SIDE_BY_SIDE).matches);
   const sourcesRef = useRef(null);
+  // Beside the answer, 'nearest' moves the sources without pulling the answer away.
+  const block = pro ? 'nearest' : 'center';
 
   const follow = (n, from) => {
     const source = sourcesRef.current.querySelectorAll('details')[n - 1];
     source.open = true;
     source.querySelector('summary').focus({ preventScroll: true });
-    source.scrollIntoView({ behavior: scrollBehavior(), block: 'center' });
+    source.scrollIntoView({ behavior: scrollBehavior(), block });
     setFollowed({ n, from });
   };
 
   const goBack = () => {
     followed.from.focus({ preventScroll: true });
-    followed.from.scrollIntoView({ behavior: scrollBehavior(), block: 'center' });
+    followed.from.scrollIntoView({ behavior: scrollBehavior(), block });
     setFollowed(null);
   };
 
@@ -157,6 +168,10 @@ function Turn({ turn }) {
           aria-label={`Source ${n}: ${document}, page ${page}`}
           title={`${document}, page ${page}`}
           onClick={(e) => follow(n, e.currentTarget)}
+          onPointerEnter={() => setHinted(n)}
+          onPointerLeave={() => setHinted(null)}
+          onFocus={() => setHinted(n)}
+          onBlur={() => setHinted(null)}
         >
           {n}
         </button>
@@ -186,7 +201,7 @@ function Turn({ turn }) {
         <div className="answer-loading">
           <p className="thinking">
             <Sphere className="sphere-turning" strokeWidth={5} />
-            Atlas is reading your documents…
+            {copy.thinking}
           </p>
           <div className="skeleton" />
           <div className="skeleton" />
@@ -222,7 +237,8 @@ function Turn({ turn }) {
                 {turn.sources.map((s, i) => (
                   <li key={i}>
                     <details
-                      className={`source${followed?.n === i + 1 ? ' active' : ''}${uncited(i + 1) ? ' uncited' : ''}`}
+                      className={`source${followed?.n === i + 1 ? ' active' : ''}${hinted === i + 1 ? ' hinted' : ''}${uncited(i + 1) ? ' uncited' : ''}`}
+                      open={evidenceOpen && !uncited(i + 1)}
                     >
                       <summary>
                         <b>{i + 1}</b>
@@ -264,7 +280,9 @@ function Turn({ turn }) {
   );
 }
 
-function Ask({ readyCount, loading, loaded, onOpenLibrary, onStateChange }) {
+function Ask({ documents, readyCount, loading, loaded, onOpenLibrary, onStateChange }) {
+  const pro = useTheme() === 'pro';
+  const copy = useCopy();
   const [turns, setTurns] = useState([]);
   const [input, setInput] = useState('');
   const threadRef = useRef(null);
@@ -337,7 +355,7 @@ function Ask({ readyCount, loading, loaded, onOpenLibrary, onStateChange }) {
     <div className="first-document">
       <BookOpen size={18} />
       <div>
-        <strong>Atlas has nothing to carry yet.</strong>
+        <strong>{copy.noDocuments}</strong>
         <span>Add your first PDF, then ask about it.</span>
       </div>
       <button className="text-button" onClick={onOpenLibrary}>
@@ -346,78 +364,77 @@ function Ask({ readyCount, loading, loaded, onOpenLibrary, onStateChange }) {
     </div>
   );
 
-  return (
-    <div className="ask">
-      <p className="sr-only" role="status">
-        {announcement}
-      </p>
-      {turns.length === 0 ? (
-        <>
-          <section className="empty">
-            <div className="hero-copy">
-              <h1>
-                The weight of knowledge.
-                <br />
-                <em>Lifted.</em>
-              </h1>
-              <p>
-                Give Atlas your documents. Ask what you need to know, and follow every answer back to the page
-                it came from.
-              </p>
-              <div className="hero-proof">
-                <ShieldCheck size={15} />
-                <span>Private to your workspace.</span>
-              </div>
-            </div>
-          </section>
-          {firstDocument || (
-            <section className="discovery" aria-labelledby="discovery-title">
-              <div className="discovery-heading">
-                <h2 id="discovery-title">Start with a question</h2>
-              </div>
-              <div className="prompt-grid">
-                {STARTERS.map(([Icon, title, description, starter]) => (
-                  <button
-                    className="prompt-card"
-                    key={title}
-                    disabled={!readyCount || loading}
-                    onClick={() => {
-                      setInput(starter);
-                      // after the input re-renders: focus it with the cursor at the end
-                      requestAnimationFrame(() => {
-                        inputRef.current?.focus();
-                        inputRef.current?.setSelectionRange(starter.length, starter.length);
-                      });
-                    }}
-                  >
-                    <div className="prompt-card-top">
-                      <Icon size={19} />
-                    </div>
-                    <h3>
-                      {title}
-                      <ArrowUpRight size={16} />
-                    </h3>
-                    <p>{description}</p>
-                  </button>
-                ))}
-              </div>
-            </section>
+  const hero = (
+    <section className="empty">
+      <div className="hero-copy">
+        <h1>
+          {copy.hero[0]}
+          {copy.hero[1] && (
+            <>
+              <br />
+              <em>{copy.hero[1]}</em>
+            </>
           )}
-        </>
-      ) : (
-        <div className="thread" aria-busy={busy} ref={threadRef}>
-          <div className="thread-heading">
-            <h1>Atlas answers.</h1>
-            <span>
-              {turns.length} question{turns.length !== 1 ? 's' : ''}
-            </span>
-          </div>
-          {turns.map((t, i) => (
-            <Turn key={i} turn={t} />
-          ))}
+        </h1>
+        <p>{copy.heroText}</p>
+        <div className="hero-proof">
+          <ShieldCheck size={15} />
+          <span>Private to your workspace.</span>
         </div>
-      )}
+      </div>
+      {pro && <Stats documents={documents} loaded={loaded} />}
+    </section>
+  );
 
+  const starters = firstDocument || (
+    <section className="discovery" aria-labelledby="discovery-title">
+      <div className="discovery-heading">
+        <h2 id="discovery-title">Start with a question</h2>
+      </div>
+      <div className="prompt-grid">
+        {STARTERS.map(([Icon, title, description, starter]) => (
+          <button
+            className="prompt-card"
+            key={title}
+            disabled={!readyCount || loading}
+            onClick={() => {
+              setInput(starter);
+              // after the input re-renders: focus it with the cursor at the end
+              requestAnimationFrame(() => {
+                inputRef.current?.focus();
+                inputRef.current?.setSelectionRange(starter.length, starter.length);
+              });
+            }}
+          >
+            <div className="prompt-card-top">
+              <Icon size={19} />
+            </div>
+            <h3>
+              {title}
+              <ArrowUpRight size={16} />
+            </h3>
+            <p>{description}</p>
+          </button>
+        ))}
+      </div>
+    </section>
+  );
+
+  const thread = (
+    <div className="thread" aria-busy={busy} ref={threadRef}>
+      <div className="thread-heading">
+        <h1>{copy.threadTitle}</h1>
+        <span>
+          {turns.length} question{turns.length !== 1 ? 's' : ''}
+        </span>
+      </div>
+      {turns.map((t, i) => (
+        <Turn key={i} turn={t} />
+      ))}
+    </div>
+  );
+
+  const composer = (
       <div className="composer">
         {turns.length > 0 && firstDocument}
         <form onSubmit={handleSubmit}>
@@ -459,6 +476,35 @@ function Ask({ readyCount, loading, loaded, onOpenLibrary, onStateChange }) {
           </span>
         </div>
       </div>
+  );
+
+  const announcer = (
+    <p className="sr-only" role="status">
+      {announcement}
+    </p>
+  );
+
+  // Each layout keeps the composer in one slot of the tree whether or not there's
+  // a thread, so asking the first question doesn't remount it and lose focus.
+  return pro ? (
+    <div className="ask">
+      {announcer}
+      {turns.length === 0 && hero}
+      {composer}
+      {turns.length === 0 ? starters : thread}
+    </div>
+  ) : (
+    <div className="ask">
+      {announcer}
+      {turns.length === 0 ? (
+        <>
+          {hero}
+          {starters}
+        </>
+      ) : (
+        thread
+      )}
+      {composer}
     </div>
   );
 }

@@ -1,12 +1,17 @@
-import { useState, useEffect, useLayoutEffect, useCallback, useRef } from 'react';
+import { lazy, Suspense, useState, useEffect, useLayoutEffect, useCallback, useRef } from 'react';
 import { motion } from 'motion/react';
-import { BookOpen, Compass, LogOut } from 'lucide-react';
+import { BookOpen, Compass, LogOut, Plug } from 'lucide-react';
 import Ask from './components/Ask';
+import Connect from './components/Connect';
 import Library from './components/Library';
 import SignIn from './components/SignIn';
 import Sphere from './components/Sphere';
-import TitanScene from './components/TitanScene';
 import api, { getKey, clearKey, setUnauthorizedHandler } from './services/api';
+import { savedTheme, saveTheme, ThemeContext } from './theme';
+import proCss from './pro.css?inline';
+
+// Only one stylesheet is ever on the page, so neither theme has to undo the other.
+const TitanWorld = lazy(() => import('./components/TitanWorld'));
 
 // While any document is pending, the library is re-read this often, so
 // statuses change on screen as the worker finishes them.
@@ -14,17 +19,21 @@ const POLL_MS = 1500;
 
 // Views live in the URL hash: the API serves the UI as static files, so a path
 // wouldn't survive a reload. Other hashes (the skip link's) leave the view alone.
-const VIEWS = { '': 'ask', '#/ask': 'ask', '#/library': 'library' };
-const TITLES = { ask: 'Ask Atlas', library: 'Library | Atlas' };
+const VIEWS = { '': 'ask', '#/ask': 'ask', '#/library': 'library', '#/connect': 'connect' };
+const TITLES = { ask: 'Ask Atlas', library: 'Library | Atlas', connect: 'Connect | Atlas' };
 
 const TABS = [
   ['ask', 'Ask Atlas', Compass],
   ['library', 'Library', BookOpen],
+  ['connect', 'Connect', Plug],
 ];
 
 function App() {
+  const [theme, setTheme] = useState(savedTheme);
+  const titan = theme === 'titan';
   const [signedIn, setSignedIn] = useState(Boolean(getKey()));
-  const [view, setView] = useState(VIEWS[window.location.hash] ?? 'ask');
+  const [route, setView] = useState(VIEWS[window.location.hash] ?? 'ask');
+  const view = titan && route === 'connect' ? 'ask' : route; // the titan keeps its two original tabs
   const [navigated, setNavigated] = useState(false); // past the opening reveal
   const scrollTops = useRef({});
   const [documents, setDocuments] = useState([]);
@@ -101,28 +110,28 @@ function App() {
     window.location.hash = '/library';
   };
 
+  const flipTheme = () => {
+    const next = titan ? 'pro' : 'titan';
+    saveTheme(next);
+    setTheme(next);
+  };
+
   // The scene reads the app: what's open, whether Atlas is reading, how much it carries.
   const mode = !signedIn ? 'signin' : view === 'library' ? 'library' : asking.hasThread ? 'thread' : 'ask';
-  const scene = (
-    <TitanScene
+  const skin = titan ? (
+    <TitanWorld
       mode={mode}
       charge={signedIn ? Math.min(1, 0.2 + ready * 0.14) : 0.72}
       reading={asking.busy}
       documents={documents}
     />
+  ) : (
+    <style>{proCss}</style>
   );
 
-  if (!signedIn)
-    return (
-      <>
-        {scene}
-        <SignIn onSignIn={() => setSignedIn(true)} />
-      </>
-    );
-
-  return (
-    <>
-      {scene}
+  const app = !signedIn ? (
+    <SignIn onSignIn={() => setSignedIn(true)} onSecret={flipTheme} />
+  ) : (
       <div className={navigated ? 'shell navigated' : 'shell'}>
         <a className="skip-link" href="#main-content">
           Skip to content
@@ -131,9 +140,10 @@ function App() {
           <div className="brand">
             <Sphere strokeWidth={3} />
             <span>Atlas</span>
+            {!titan && <small>Multi-tenant RAG</small>}
           </div>
           <nav className="tabs" aria-label="Sections">
-            {TABS.map(([id, label, Icon]) => (
+            {TABS.filter(([id]) => !titan || id !== 'connect').map(([id, label, Icon]) => (
               <a key={id} className="tab" href={`#/${id}`} aria-current={view === id ? 'page' : undefined}>
                 <Icon size={17} />
                 <span>{label}</span>
@@ -174,6 +184,7 @@ function App() {
           )}
           <div className="view" hidden={view !== 'ask'}>
             <Ask
+              documents={documents}
               readyCount={ready}
               loading={loading}
               loaded={loaded}
@@ -184,9 +195,22 @@ function App() {
           <div className="view" hidden={view !== 'library'}>
             <Library documents={documents} onChange={loadDocuments} loading={loading} loaded={loaded} />
           </div>
+          {!titan && (
+            <div className="view" hidden={view !== 'connect'}>
+              <Connect active={view === 'connect'} />
+            </div>
+          )}
         </main>
       </div>
-    </>
+  );
+
+  return (
+    <ThemeContext.Provider value={theme}>
+      <Suspense fallback={null}>
+        {skin}
+        {app}
+      </Suspense>
+    </ThemeContext.Provider>
   );
 }
 
