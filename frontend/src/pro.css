@@ -120,10 +120,6 @@ pre {
 .skip-link:focus {
   top: 12px;
 }
-.main-content:focus,
-main:focus {
-  outline: none;
-}
 
 /* shared controls */
 .btn {

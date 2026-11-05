@@ -1,6 +1,6 @@
 // Atlas's mark: an armillary sphere (horizon, meridian, and the ecliptic at the
 // 23.5° axial tilt) resting on the curve of the titan's shoulders.
-function Sphere({ className, strokeWidth = 1.4, title }) {
+function Sphere({ className, strokeWidth = 1.4 }) {
   return (
     <svg
       className={className}
@@ -9,10 +9,8 @@ function Sphere({ className, strokeWidth = 1.4, title }) {
       stroke="currentColor"
       strokeWidth={strokeWidth}
       strokeLinecap="round"
-      role={title ? 'img' : undefined}
-      aria-hidden={title ? undefined : true}
+      aria-hidden
     >
-      {title && <title>{title}</title>}
       <circle cx="50" cy="44" r="34" />
       <ellipse cx="50" cy="44" rx="34" ry="9" />
       <ellipse cx="50" cy="44" rx="11" ry="34" />

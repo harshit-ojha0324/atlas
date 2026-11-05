@@ -5,21 +5,8 @@ import { createContext, useContext } from 'react';
 // are drawn by titan.css in front of TitanScene. Kept per tab, like the API key.
 const KEY = 'atlas.theme';
 
-export const savedTheme = () => {
-  try {
-    return sessionStorage.getItem(KEY) === 'titan' ? 'titan' : 'pro';
-  } catch {
-    return 'pro';
-  }
-};
-
-export const saveTheme = (theme) => {
-  try {
-    sessionStorage.setItem(KEY, theme);
-  } catch {
-    // no storage: the theme still changes, it just won't survive a reload
-  }
-};
+export const savedTheme = () => (sessionStorage.getItem(KEY) === 'titan' ? 'titan' : 'pro');
+export const saveTheme = (theme) => sessionStorage.setItem(KEY, theme);
 
 export const ThemeContext = createContext('pro');
 export const useTheme = () => useContext(ThemeContext);
