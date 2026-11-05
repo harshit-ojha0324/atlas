@@ -71,7 +71,10 @@ The API serves a web interface at `/`, so it shares the API's origin and needs n
 - **Sign in** with a workspace's API key. The key is kept for the browser tab only and cleared when it closes.
 - **Ask** answers questions and keeps the conversation for follow-ups. On wide screens the sources sit beside the answer. Each `[n]` citation opens and highlights the passage it came from, and passages the answer didn't cite are collapsed and dimmed. Any security notes and the model that answered are shown with the answer. Suggestion cards start a question for you to finish with a topic.
 - **Library** shows document and passage counts, search and a status filter. New uploads show as processing and switch to ready (or failed, with the reason) on their own.
-- **Connect** shows live readiness for Postgres, Redis and forge, and how to reach the workspace over REST and MCP.
+- **Gateway** shows the workspace's token use and rate limits right now, whether forge's primary model is in use, the last 7 days of answers (by model, from cache, declined, failed, and how long they took), and how to connect over REST and MCP.
+- **System** shows live readiness for Postgres, Redis and forge, the workers alive, the workspace's processing queue and security events, the recorded results of `make verify`, and the known limits.
+
+These numbers are the workspace's own. Anything Atlas can't read right now shows as unknown, never as zero.
 
 The sign-in screen also hides an easter egg.
 
@@ -79,7 +82,9 @@ The sign-in screen also hides an easter egg.
 
 <img src="docs/images/ui-library.png" alt="Library: counts, an upload area, a note on what happens to a PDF, and a list with three documents ready and a fourth processing" width="720">
 
-<img src="docs/images/ui-connect.png" alt="Connect page: Postgres, Redis and forge all reachable, with the REST endpoints and MCP tools listed" width="720">
+<img src="docs/images/ui-gateway.png" alt="Gateway page: token use, rate limits, primary model status and the last 7 days of answers" width="720">
+
+<img src="docs/images/ui-system.png" alt="System page: services reachable, workers alive, the processing queue, security events and recorded check results" width="720">
 
 <img src="docs/images/ui-signin.png" alt="Sign-in screen: a large armillary sphere and three short points beside the API key form" width="720">
 
@@ -97,6 +102,8 @@ All endpoints except health checks require an `X-API-Key` header.
 | `DELETE /documents/{id}` | Delete a document and its chunks. |
 | `POST /search` | `{query, k}`: the `k` nearest passages (default 4, max 20) with document, page and similarity score. |
 | `POST /ask` | `{question, history?, k?}`: an answer with cited sources: a citation like `[1]` is the first entry in `sources`. With `history`, the question is treated as a follow-up. The response includes `security_warnings` and `forge_backend` (the model that answered, or `cache`). |
+| `GET /gateway` | This tenant's token quota and rate limits, forge's breaker state, and its last 7 days of answers and their latency. A value that can't be read is `null`. |
+| `GET /system` | Workers alive, this tenant's ingest queue, document totals and security events, and the recorded results of `make verify`. A value that can't be read is `null`. |
 | `GET /healthz`, `/readyz`, `/metrics` | Liveness, readiness (Postgres and Redis), Prometheus metrics. |
 
 Rate-limited responses return `429` with `Retry-After`.
@@ -197,11 +204,12 @@ Settings are read from the environment (see `app/config.py`). The most relevant:
 
 ```bash
 pip install -e '.[dev]'    # with the stack running for the database tests
-make test                  # 64 tests
+make test                  # 80 tests
 make eval                  # retrieval and grounding evaluation
 make drill                 # crash recovery
 make drill-fairness        # cross-tenant fairness
 make bench                 # load test
+make verify                # tests, eval and drills; records the results shown on the System page
 ```
 
 | Check | What it verifies | Latest result |
@@ -240,7 +248,7 @@ The load test on a GitHub-hosted runner ([CI run 40813987003](https://github.com
 - Fair scheduling is per document; a very large PDF occupies a worker until it finishes.
 - PII and injection detection are pattern-based. Ten-digit numbers such as order IDs are redacted as phone numbers.
 - `/ask` does not stream responses.
-- The web interface's smoke test (`frontend/tests/ui-smoke.cjs`, 132 checks against API fixtures) runs locally with Playwright and is not part of CI.
+- The web interface's smoke test (`frontend/tests/ui-smoke.cjs`, 162 checks against API fixtures) runs locally with Playwright and is not part of CI.
 - There is no command to delete a tenant.
 - Every tenant gets the same forge quota and weight, set on atlas's entry in forge's tenants file.
 - A missing API key returns `422` rather than `401`.
