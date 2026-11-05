@@ -1,5 +1,45 @@
 [
   {
+    "id": "tests",
+    "label": "Backend tests",
+    "passed": true,
+    "detail": "79 passed",
+    "date": "2026-11-05",
+    "commit": "7884c09"
+  },
+  {
+    "id": "eval",
+    "label": "Retrieval evaluation",
+    "passed": true,
+    "detail": "context relevance 100%, grounded-response rate 100%",
+    "date": "2026-11-05",
+    "commit": "7884c09"
+  },
+  {
+    "id": "drill",
+    "label": "Worker killed mid-document",
+    "passed": true,
+    "detail": "562 chunks, no duplicate chunks, nothing dead-lettered",
+    "date": "2026-11-05",
+    "commit": "7884c09"
+  },
+  {
+    "id": "fairness",
+    "label": "Noisy neighbour",
+    "passed": true,
+    "detail": "waited 5.3s behind A's backlog of 5",
+    "date": "2026-11-05",
+    "commit": "7884c09"
+  },
+  {
+    "id": "ui",
+    "label": "Interface smoke test",
+    "passed": true,
+    "detail": "152 checks passed",
+    "date": "2026-11-05",
+    "commit": "7884c09"
+  },
+  {
     "id": "eval-judged",
     "label": "Answer content, judged on a real model",
     "passed": true,
