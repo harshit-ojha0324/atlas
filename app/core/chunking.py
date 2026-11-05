@@ -99,11 +99,15 @@ class SemanticChunker:
 
 
 def extract_pages(data: bytes) -> list[tuple[int, str]]:
-    """(page number, text) for every page that has text. Raises on an unreadable PDF."""
+    """(page number, text) for every page that has text. Raises on an unreadable PDF.
+
+    Layout mode places glyphs by position. The default mode splits words into
+    letters ("t h e  b o o k") on PDFs that position each glyph, such as macOS
+    Quartz exports. Layout mode pads lines to page width, so whitespace is
+    collapsed; nothing downstream needs the line breaks."""
     reader = PdfReader(io.BytesIO(data))
-    return [
-        (n, text) for n, page in enumerate(reader.pages, 1) if (text := page.extract_text()) and text.strip()
-    ]
+    texts = (" ".join(page.extract_text(extraction_mode="layout").split()) for page in reader.pages)
+    return [(n, text) for n, text in enumerate(texts, 1) if text]
 
 
 def build_chunks(pages: list[tuple[int, str]], embedder: Any) -> list[tuple[int, str, list[float]]]:

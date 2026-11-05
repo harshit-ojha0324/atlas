@@ -1,4 +1,11 @@
-from app.core.chunking import MAX_CHUNK_CHARS, SemanticChunker
+from helpers import make_pdf
+
+from app.core.chunking import MAX_CHUNK_CHARS, SemanticChunker, extract_pages
+
+
+def test_extraction_keeps_words_whole_and_skips_blank_pages():
+    pdf = make_pdf(["The quick brown fox", "", "jumps over the dog"])
+    assert extract_pages(pdf) == [(1, "The quick brown fox"), (3, "jumps over the dog")]
 
 
 def test_fallback_packs_words_without_exceeding_the_limit():
