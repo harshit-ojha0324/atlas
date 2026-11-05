@@ -4,8 +4,9 @@ import api from '../services/api';
 const EVERY_MS = 5000;
 
 // Re-read an endpoint while its page is open. Earlier data stays on screen if a
-// read fails, with `failed` set so the page can say it may be out of date.
-export default function useLive(path, active) {
+// read fails, with `failed` set so the page can say it may be out of date. `fetcher`
+// must be stable across renders: define it outside the component.
+export default function useLive(path, active, fetcher = api) {
   const [data, setData] = useState(null);
   const [failed, setFailed] = useState(false);
 
@@ -14,7 +15,7 @@ export default function useLive(path, active) {
     let current = true;
     const read = async () => {
       try {
-        const fresh = await api(path);
+        const fresh = await fetcher(path);
         if (current) {
           setData(fresh);
           setFailed(false);
@@ -29,7 +30,7 @@ export default function useLive(path, active) {
       current = false;
       clearInterval(timer);
     };
-  }, [path, active]);
+  }, [path, active, fetcher]);
 
   return { data, failed };
 }

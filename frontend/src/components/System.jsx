@@ -1,4 +1,3 @@
-import { useEffect, useState } from 'react';
 import useLive from './useLive';
 
 const SERVICES = [
@@ -25,28 +24,10 @@ const LIMITS = [
 ];
 
 // Public and unauthenticated, and a 503 still lists which check failed.
-function useReadiness(active) {
-  const [health, setHealth] = useState(null); // null until read; false if the API didn't answer
-  useEffect(() => {
-    if (!active) return;
-    let current = true;
-    const read = () =>
-      fetch('/readyz')
-        .then((r) => r.json())
-        .catch(() => false)
-        .then((checks) => current && setHealth(checks));
-    read();
-    const timer = setInterval(read, 5000);
-    return () => {
-      current = false;
-      clearInterval(timer);
-    };
-  }, [active]);
-  return health;
-}
+const readReadiness = (path) => fetch(path).then((r) => r.json());
 
 function System({ active }) {
-  const health = useReadiness(active);
+  const { data: health, failed: unreachable } = useLive('/readyz', active, readReadiness);
   const { data, failed } = useLive('/system', active);
   const count = (n) => (n == null ? '—' : n.toLocaleString());
 
@@ -64,9 +45,9 @@ function System({ active }) {
 
       <div className="connect-section">
         <h2>Services</h2>
-        <ul className="service-grid" aria-busy={health === null}>
+        <ul className="service-grid" aria-busy={!health && !unreachable}>
           {SERVICES.map(([id, name, role]) => {
-            const state = health === null ? 'checking' : health === false ? 'unknown' : health[id];
+            const state = unreachable ? 'unknown' : !health ? 'checking' : health[id];
             return (
               <li key={id} className="service" data-state={state}>
                 <span className="service-state">
@@ -79,7 +60,7 @@ function System({ active }) {
             );
           })}
         </ul>
-        {health === false && <p className="doc-detail failed">The API didn’t answer, so these can’t be checked.</p>}
+        {unreachable && <p className="doc-detail failed">The API didn’t answer, so these can’t be checked.</p>}
       </div>
 
       <div className="connect-section">
