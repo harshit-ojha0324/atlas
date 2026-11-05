@@ -144,6 +144,15 @@ async def test_only_recent_heartbeats_count_as_live_workers(env):
     assert (await get(env, "/system"))["workers_live"] == 1
 
 
+async def test_a_worker_shutting_down_stops_counting_at_once(env):
+    worker = env.worker("leaving")
+    worker.shutting_down = True  # run() does nothing but start and finish
+    await worker.beat()
+    assert (await get(env, "/system"))["workers_live"] == 1
+    await worker.run()
+    assert (await get(env, "/system"))["workers_live"] == 0
+
+
 async def test_a_redis_failure_never_fails_the_answer(env, forge_status, monkeypatch):
     await env.upload("a", "alpha.pdf", ["Alpha budget report."])
     await env.drain()

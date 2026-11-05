@@ -344,6 +344,10 @@ class IngestWorker:
                 await asyncio.sleep(2)
             loop_n += 1
         heartbeat.cancel()
+        try:
+            await self.redis.zrem(self.settings.workers_key, self.name)  # gone now, not after the TTL
+        except (RedisError, OSError) as exc:
+            log.warning("couldn't clear heartbeat: %r", exc)
         log.info("graceful shutdown complete")
 
     def request_shutdown(self, *_):
