@@ -4,6 +4,7 @@ import { MotionConfig } from 'motion/react'
 import '@fontsource-variable/space-grotesk'
 import '@fontsource-variable/geist'
 import '@fontsource-variable/jetbrains-mono'
+import './base.css'
 import App from './App'
 
 ReactDOM.createRoot(document.getElementById('root')).render(

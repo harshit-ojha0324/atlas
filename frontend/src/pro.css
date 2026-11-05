@@ -42,19 +42,6 @@
   --bar: 72px;
   --composer: 92px;
 }
-* {
-  box-sizing: border-box;
-}
-body,
-h1,
-h2,
-h3,
-h4,
-p,
-ul,
-ol {
-  margin: 0;
-}
 body {
   min-height: 100dvh;
   background-color: var(--canvas);
@@ -82,24 +69,12 @@ h4 {
   line-height: 1.2;
   font-weight: 600;
 }
-button,
-input,
-select {
-  font: inherit;
-  color: inherit;
-}
 button {
   cursor: pointer;
   text-align: inherit;
   background: none;
   border: 0;
   padding: 0;
-}
-button:disabled {
-  cursor: not-allowed;
-}
-button svg {
-  flex-shrink: 0;
 }
 button,
 a,
@@ -131,17 +106,6 @@ pre {
 :focus-visible {
   outline: 2px solid var(--cyan);
   outline-offset: 2px;
-}
-[hidden] {
-  display: none !important;
-}
-.sr-only {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  overflow: hidden;
-  clip-path: inset(50%);
-  white-space: nowrap;
 }
 .skip-link {
   position: fixed;

@@ -39,19 +39,6 @@
   --move: 0.28s;
   --sky-h: clamp(120px, 24vh, 250px);
 }
-* {
-  box-sizing: border-box;
-}
-body,
-h1,
-h2,
-h3,
-h4,
-p,
-ul,
-ol {
-  margin: 0;
-}
 body {
   min-height: 100dvh;
   background: var(--void); /* painted on the canvas, so the fixed stage shows above it */
@@ -63,12 +50,6 @@ body {
   scrollbar-color: var(--iron) var(--void);
   accent-color: var(--ember);
   caret-color: var(--ember);
-}
-button,
-input,
-select {
-  font: inherit;
-  color: inherit;
 }
 button,
 summary,
@@ -92,12 +73,6 @@ summary {
     box-shadow var(--fast) ease-out,
     transform var(--fast) ease-out;
 }
-button:disabled {
-  cursor: not-allowed;
-}
-button svg {
-  flex-shrink: 0;
-}
 ::selection {
   background: #8c2f0c;
   color: #fff6ec;
@@ -105,17 +80,6 @@ button svg {
 :focus-visible {
   outline: 2px solid var(--lava);
   outline-offset: 3px;
-}
-[hidden] {
-  display: none !important;
-}
-.sr-only {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  overflow: hidden;
-  clip-path: inset(50%);
-  white-space: nowrap;
 }
 .skip-link {
   position: fixed;
