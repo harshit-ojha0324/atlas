@@ -101,7 +101,6 @@ async def env(database):
     sessions = make_sessionmaker(engine)
     async with engine.begin() as conn:
         await conn.execute(text("TRUNCATE tenants RESTART IDENTITY CASCADE"))
-    deps._KEY_CACHE.clear()  # ids restart, so cached key -> tenant mappings would be stale
     keys, ids = {}, {}
     async with sessions() as session:
         for name in ("a", "b"):

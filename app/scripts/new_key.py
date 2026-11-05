@@ -5,7 +5,7 @@ The key is printed once. Keys already issued keep working.
 """
 
 # ponytail: no revocation, so this can't shut out a leaked key; add it when keys
-# are shared beyond one person. The API's key cache would delay it by up to 60s.
+# are shared beyond one person.
 
 import asyncio
 import sys
