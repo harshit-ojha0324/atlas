@@ -2,6 +2,9 @@
 // in sessionStorage: it lasts for this tab and is gone when the tab closes.
 const KEY = 'atlas.apiKey';
 
+// forge's backend ids, as names
+export const BACKENDS = { gemini: 'Gemini', vllm: 'vLLM', cache: 'Cache' };
+
 export const getKey = () => sessionStorage.getItem(KEY);
 export const setKey = (key) => sessionStorage.setItem(KEY, key);
 export const clearKey = () => sessionStorage.removeItem(KEY);

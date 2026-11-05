@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Check, Copy, ExternalLink } from 'lucide-react';
 import useLive from './useLive';
+import { BACKENDS } from '../services/api';
 
 const ENDPOINTS = [
   ['POST', '/documents', 'Upload a PDF, up to 10 MB. Returns 202 while it’s processed.'],
@@ -45,32 +46,26 @@ const BREAKER = {
   open: ['down', 'Skipped', 'The primary model is failing, so answers go straight to the fallback.'],
 };
 
-const BACKENDS = { gemini: 'Gemini', vllm: 'vLLM', cache: 'Cache' };
-
 const perMinute = (perSecond) => {
   const n = perSecond * 60;
   return `Refills ${Number.isInteger(n) ? n : n.toFixed(1)} a minute`;
 };
 
-function Meter({ label, value, max, children }) {
+// A null value is unknown, never zero: it shows a dash and says why.
+function Meter({ label, value, max, unknown, children }) {
+  const known = value != null;
   return (
     <div className="meter-card">
       <span>{label}</span>
-      <strong>
-        {value.toLocaleString()} <small>/ {max.toLocaleString()}</small>
-      </strong>
-      <progress value={value} max={max} aria-label={label} />
-      <small>{children}</small>
-    </div>
-  );
-}
-
-function Unavailable({ label, children }) {
-  return (
-    <div className="meter-card">
-      <span>{label}</span>
-      <strong>—</strong>
-      <small>{children}</small>
+      {known ? (
+        <strong>
+          {value.toLocaleString()} <small>/ {max.toLocaleString()}</small>
+        </strong>
+      ) : (
+        <strong>—</strong>
+      )}
+      {known && <progress value={value} max={max} aria-label={label} />}
+      <small>{known ? children : unknown}</small>
     </div>
   );
 }
@@ -84,6 +79,7 @@ function Gateway({ active }) {
   const count = (n) => (n == null ? '—' : n.toLocaleString());
   const query = data?.rate_limits?.query;
   const upload = data?.rate_limits?.upload;
+  const unknownFrom = (source) => (data ? `${source} didn’t answer, so this is unknown.` : 'Loading…');
 
   const askExample = `curl ${window.location.origin}/ask \\
   -H "X-API-Key: $ATLAS_API_KEY" \\
@@ -108,34 +104,37 @@ function Gateway({ active }) {
       <div className="connect-section" aria-busy={!data && !failed}>
         <h2>Right now</h2>
         <div className="meter-grid">
-          {data?.quota ? (
-            <Meter label="Tokens used today" value={data.quota.used_tokens} max={data.quota.daily_token_quota}>
-              Resets at midnight UTC. Cached answers use none.
-            </Meter>
-          ) : (
-            <Unavailable label="Tokens used today">{data ? 'forge didn’t answer, so this is unknown.' : 'Loading…'}</Unavailable>
-          )}
-          {query ? (
-            <Meter label="Questions available" value={Math.floor(query.available)} max={query.capacity}>
-              {perMinute(query.refill_per_s)}. Also covers search.
-            </Meter>
-          ) : (
-            <Unavailable label="Questions available">{data ? 'Redis didn’t answer, so this is unknown.' : 'Loading…'}</Unavailable>
-          )}
-          {upload ? (
-            <Meter label="Uploads available" value={Math.floor(upload.available)} max={upload.capacity}>
-              {perMinute(upload.refill_per_s)}.
-            </Meter>
-          ) : (
-            <Unavailable label="Uploads available">{data ? 'Redis didn’t answer, so this is unknown.' : 'Loading…'}</Unavailable>
-          )}
+          <Meter
+            label="Tokens used today"
+            value={data?.quota?.used_tokens}
+            max={data?.quota?.daily_token_quota}
+            unknown={unknownFrom('forge')}
+          >
+            Resets at midnight UTC. Cached answers use none.
+          </Meter>
+          <Meter
+            label="Questions available"
+            value={query && Math.floor(query.available)}
+            max={query?.capacity}
+            unknown={unknownFrom('Redis')}
+          >
+            {query && perMinute(query.refill_per_s)}. Also covers search.
+          </Meter>
+          <Meter
+            label="Uploads available"
+            value={upload && Math.floor(upload.available)}
+            max={upload?.capacity}
+            unknown={unknownFrom('Redis')}
+          >
+            {upload && perMinute(upload.refill_per_s)}.
+          </Meter>
           <div className="meter-card" data-state={breaker?.[0] ?? 'unknown'}>
             <span>Primary model</span>
             <strong className="breaker">
               <i />
               {breaker?.[1] ?? '—'}
             </strong>
-            <small>{breaker?.[2] ?? (data ? 'forge didn’t answer, so this is unknown.' : 'Loading…')}</small>
+            <small>{breaker?.[2] ?? unknownFrom('forge')}</small>
           </div>
         </div>
       </div>

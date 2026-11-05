@@ -15,7 +15,7 @@ import {
 } from 'lucide-react';
 import Sphere from './Sphere';
 import Stats from './Stats';
-import api from '../services/api';
+import api, { BACKENDS } from '../services/api';
 import { useCopy, useTheme } from '../theme';
 
 // The API accepts up to 20 history messages (10 question-answer turns) of up to
@@ -97,9 +97,6 @@ function Prose({ text, cite }) {
     return b.type === 'p' ? <p key={i}>{inline(b.lines.join(' '), cite)}</p> : null;
   });
 }
-
-// forge's backend ids, as names
-const BACKENDS = { gemini: 'Gemini', vllm: 'vLLM' };
 
 // The API names what it redacted or masked by detector label; say it in words.
 const LABELS = {
