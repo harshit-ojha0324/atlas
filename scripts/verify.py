@@ -45,7 +45,7 @@ UI_CHECK = ("Interface smoke test", ["node", "frontend/tests/ui-smoke.cjs"], [r"
 JUDGE_CHECK = (
     "Answer content, judged on a real model",
     [PY, "scripts/run_eval.py", "--judge-answers"],
-    [r"(\d+/\d+ answers[^\n]*)"],
+    [r"(grounded-response rate)\s*: (\d+%)", r"(answered by)\s*: \{(.*)\}"],
 )
 
 
