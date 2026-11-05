@@ -1,10 +1,11 @@
 """readyz: Postgres and Redis gate readiness; forge is reported, never gating."""
 
+from unittest.mock import AsyncMock, MagicMock
+
 import fakeredis
 import httpx
 import pytest
 import respx
-from sqlalchemy.ext.asyncio import create_async_engine
 
 from app.main import create_app
 
@@ -14,7 +15,8 @@ FORGE = "http://forge.test"
 @pytest.fixture
 async def client():
     app = create_app()  # no lifespan under ASGITransport: wire state by hand
-    app.state.engine = create_async_engine("sqlite+aiosqlite://")
+    app.state.engine = MagicMock()  # just enough for readyz's SELECT 1
+    app.state.engine.connect.return_value.__aenter__.return_value.execute = AsyncMock()
     app.state.redis = fakeredis.FakeAsyncRedis()
     app.state.forge = httpx.AsyncClient(base_url=FORGE)
     # only forge's URL is mocked; the ASGI test client must pass through
@@ -22,7 +24,6 @@ async def client():
         async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://t") as c:
             yield app, c, forge
     await app.state.forge.aclose()
-    await app.state.engine.dispose()
 
 
 async def test_ready_when_all_up(client):
