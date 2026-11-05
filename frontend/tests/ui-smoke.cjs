@@ -757,6 +757,14 @@ async function noOverflow(page, label) {
     await fresh.goto(origin);
     await fresh.getByText('Welcome to Atlas.', { exact: true }).waitFor();
     check((await fresh.locator('.stage').count()) === 0, 'a new tab starts on the professional theme');
+    // A tab opened before a rebuild: the titan's chunk name is gone the first time.
+    let chunkMisses = 0;
+    await fresh.route(/TitanWorld/, (route) =>
+      chunkMisses++ ? route.continue() : route.fulfill({ status: 404, body: '{"detail":"Not Found"}' }),
+    );
+    for (let i = 0; i < 7; i++) await fresh.locator('.signin .brand-name').click();
+    await fresh.locator('h1', { hasText: 'He holds up the sky.' }).waitFor();
+    check(chunkMisses === 2, 'a missing titan chunk reloads the page once instead of going blank');
     await fresh.close();
     check(errors.length === 0, `no browser runtime errors (${errors.join('; ')})`);
     console.log(`\n${checks} checks passed. Screenshots: ${output}`);

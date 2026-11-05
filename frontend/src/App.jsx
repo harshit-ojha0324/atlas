@@ -12,7 +12,24 @@ import { savedTheme, saveTheme, ThemeContext } from './theme';
 import proCss from './pro.css?inline';
 
 // Only one stylesheet is ever on the page, so neither theme has to undo the other.
-const TitanWorld = lazy(() => import('./components/TitanWorld'));
+// A tab opened before a rebuild asks for a chunk name that's gone, and a failed
+// lazy import blanks the whole page. Reloading fetches the new names; the flag
+// stops a reload loop if the chunk really is missing.
+const RELOADED = 'atlas.reloadedForChunk';
+const TitanWorld = lazy(() =>
+  import('./components/TitanWorld').then(
+    (module) => {
+      sessionStorage.removeItem(RELOADED);
+      return module;
+    },
+    (error) => {
+      if (sessionStorage.getItem(RELOADED)) throw error;
+      sessionStorage.setItem(RELOADED, '1');
+      window.location.reload();
+      return new Promise(() => {}); // the page is going away
+    },
+  ),
+);
 
 // While any document is pending, the library is re-read this often, so
 // statuses change on screen as the worker finishes them.
